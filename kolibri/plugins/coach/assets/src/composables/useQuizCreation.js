@@ -2,8 +2,11 @@ import { get, set } from '@vueuse/core';
 import { ref, onMounted } from 'kolibri.lib.vueCompositionApi';
 
 /**
- * # Type Definitions
- * These are for reference and should be updated as the model for a quiz or its parts changes
+ * ###
+ * # Type documentation & validation
+ * ###
+ * Some tools for enforcing data structures and providing referencable type definitions for the
+ * greater Quiz Creation feature.
  */
 
 /*
@@ -11,8 +14,19 @@ import { ref, onMounted } from 'kolibri.lib.vueCompositionApi';
  * @property {string}         title               The title of the whole quiz
  * @property {QuizSection[]}  question_sources    A list of the QuizSection objects that make up the
  *                                                quiz
+ *
  * TODO Outline any other fields here that are relevant to our needs
  */
+
+const _quizProps = ['title', 'question_sources'];
+
+/**
+ * @param {Object}   possibleQuiz
+ * @returns {boolean} True if every property in section is in _quizSectionProps
+ */
+export function isQuiz(possibleQuiz) {
+  return possibleQuiz && Object.keys(possibleQuiz).every(p => _quizProps.includes(p));
+}
 
 /*
  * @typedef  {Object}           QuizSection                Defines a single section of the quiz
@@ -28,6 +42,24 @@ import { ref, onMounted } from 'kolibri.lib.vueCompositionApi';
  *                                                         randomized, to the learners
  * @property {ExerciseMap}      exercise_pool              An array of contentnode ids indicat
  */
+
+const _quizSectionProps = [
+  'section_id',
+  'section_title',
+  'description',
+  'question_count',
+  'questions',
+  'learners_see_fixed_order',
+  'exercise_pool',
+];
+
+/**
+ * @param {Object}   section
+ * @returns {boolean} True if every property in section is in _quizSectionProps
+ */
+export function isQuizSection(possibleSection) {
+  return possibleSection && Object.keys(possibleSection).every(p => _quizSectionProps.includes(p));
+}
 
 /*
  * @typedef  {Object} QuizQuestion         A particular question in a Quiz
@@ -61,12 +93,21 @@ import { ref, onMounted } from 'kolibri.lib.vueCompositionApi';
 // ============ //
 
 /* @type {ref<QuizSection>}
- * The currently selection QuizSection object to be initialized to the first section in the quiz */
+ * The currently selection QuizSection object to be initialized to the first section in the quiz.
+ * This is the source-of-truth for what should be visible to the coach as it will reflect changes
+ * that have not yet been saved to the rootQuiz object.
+ * */
 export const activeSection = ref(null);
+
 /* @type {ref<Quiz>}
  * The overall Quiz object */
 export const rootQuiz = ref(null);
 
+/** A composable for initializing and interacting with the rootQuiz state
+ *
+ * @affects {rootQuiz}
+ * @affects {activeSection}
+ **/
 export function useQuiz() {
   const { createSection } = useQuizSection();
 
@@ -81,7 +122,55 @@ export function useQuiz() {
 
   /* @param {Quiz} updates  The properties of rootQuiz to be updated */
   function updateQuiz(updates) {
-    set(rootQuiz, { ...rootQuiz, ...updates });
+    if (!isQuiz(updates)) {
+      throw new TypeError(`Invalid Quiz object: ${JSON.stringify(updates)}`);
+    }
+    set(rootQuiz, { ...get(rootQuiz), ...updates });
+  }
+
+  /* @returns {QuizSection}
+   * Adds a new QuizSection to rootQuiz, sets it as the activeSection and returns the new section
+   * */
+  function addSection() {
+    const newSection = createSection();
+    set(activeSection, newSection);
+    updateQuiz({ question_sources: [...getQuizSections(), newSection] });
+    return newSection;
+  }
+
+  /* @param   {string}  sectionId  The ID of the section to be deleted
+   * @returns {QuizSection}        The new active section
+   */
+  function deleteSection(sectionId) {
+    const question_sources = getQuizSections().filter(s => s.section_id !== sectionId);
+    updateQuiz({ question_sources });
+
+    if (question_sources.length > 0) {
+      const newActiveSection = question_sources[0];
+      set(activeSection, newActiveSection);
+      return newActiveSection;
+    } else {
+      // If we delete the last question, make a new one and return it as it will be made active
+      // automatically in addSection
+      return addSection();
+    }
+  }
+
+  /* @returns {QuizSection[]} */
+  function getQuizSections() {
+    return get(rootQuiz).question_sources;
+  }
+
+  /* commits change to the active section to the rootQuiz object by updating rootQuiz */
+  function saveActiveSection() {
+    const activeSectionId = get(activeSection).section_id;
+    const question_sources = getQuizSections().map(s => {
+      if (s.section_id === activeSectionId) {
+        return get(activeSection);
+      }
+      return s;
+    });
+    updateQuiz({ question_sources });
   }
 
   // Initialize the rootQuiz object
@@ -89,14 +178,57 @@ export function useQuiz() {
     set(rootQuiz, _createQuiz());
   });
 
-  return { updateQuiz };
+  return { addSection, deleteSection, saveActiveSection, updateQuiz, getQuizSections, _createQuiz };
+}
+
+/* A composable providing methods for updating and reading the activeSection - that is - the
+ * section currently being edited by the user.
+ *
+ * This gives us the ability to make changes to the activeSection without committing them to the
+ * rootQuiz object until the user is ready to save their changes.
+ *
+ * Note that this should not WRITE the rootQuiz object -- utilities for such behavior belong in
+ * useQuiz()
+ *
+ * @affects {activeSection}
+ */
+export function useActiveSection() {
+  /*
+   * @param {QuizSection} updates  The properties of activeSection to be updated
+   * @throws {TypeError} when the given value does not match shape of QuizSection as defined above
+   */
+  function updateActiveSection(updates) {
+    if (!isQuizSection(updates)) {
+      throw new TypeError(`Invalid QuizSection object: ${JSON.stringify(updates)}`);
+    }
+    set(activeSection, { ...get(activeSection), ...updates });
+  }
+
+  /* Returns the value of activeSection to its last saved value within rootQuiz, clearing changes
+   * that have been made in the process */
+  function revertActiveSectionChanges() {
+    const originalSectionState = get(rootQuiz).question_sources.find(
+      s => s.section_id === get(activeSection).section_id
+    );
+
+    if (!originalSectionState) {
+      throw new Error(
+        `Could not find original section state for section ${get(activeSection).section_id}`
+      );
+    }
+
+    set(activeSection, originalSectionState);
+  }
+
+  return { revertActiveSectionChanges, updateActiveSection };
 }
 
 export function useQuizSection() {
   /* @returns {QuizSection} */
   function createSection() {
     return {
-      section_id: '',
+      // FIXME Need to properly generate this
+      section_id: `${Math.floor(Math.random() * 1000000000)}`,
       section_title: '',
       description: '',
       question_count: 0,
