@@ -36,7 +36,7 @@ const {
   addSection,
   deleteSection,
   saveActiveSectionChanges,
-  getQuizSections,
+  quizSections,
   updateQuiz,
   revertActiveSectionChanges,
   updateActiveSection,
@@ -61,7 +61,7 @@ describe('useQuizCreation', () => {
         // We only update `question_sources` so be sure we don't overwrite the title
         updateQuiz({ question_sources: 'yes' });
         expect(get(rootQuiz).title).toEqual(title);
-        expect(getQuizSections()).toEqual('yes');
+        expect(get(quizSections)).toEqual('yes');
       });
 
       it('Will throw an error if you update it with something not shaped like a Quiz', () => {
@@ -73,41 +73,41 @@ describe('useQuizCreation', () => {
       });
 
       it('Can add a section to the quiz and set it as the selected section', () => {
-        expect(getQuizSections().length).toEqual(1);
+        expect(get(quizSections).length).toEqual(1);
         addSection();
-        expect(getQuizSections().length).toEqual(2);
+        expect(get(quizSections).length).toEqual(2);
         // Also, the activeSection should be set to the new section
-        expect(get(activeSection)).toEqual(getQuizSections()[1]);
+        expect(get(activeSection)).toEqual(get(quizSections)[1]);
       });
 
       it('Can delete a section from the quiz', () => {
         // Add a section
         const section = addSection();
-        expect(getQuizSections().length).toEqual(2);
+        expect(get(quizSections).length).toEqual(2);
         // Delete the section
         deleteSection(section.section_id);
-        expect(getQuizSections().length).toEqual(1);
+        expect(get(quizSections).length).toEqual(1);
       });
 
       it('Will always have at least one section, so deleting the last will generate a new empty one', () => {
-        const s1id = getQuizSections()[0].section_id;
-        expect(getQuizSections()[0].section_id).toEqual(s1id);
+        const s1id = get(quizSections)[0].section_id;
+        expect(get(quizSections)[0].section_id).toEqual(s1id);
         deleteSection(s1id);
-        expect(getQuizSections()[0].section_id).not.toEqual(s1id);
+        expect(get(quizSections)[0].section_id).not.toEqual(s1id);
       });
 
       it('Can update a section with changes made to the activeSection', () => {
-        const section = getQuizSections()[0];
+        const section = get(quizSections)[0];
         expect(get(activeSection)).toEqual(section); // Be sure we're using the active section
         const { section_id } = section;
         set(activeSection, { section_id, section_title: 'New Title', question_count: 99 });
         saveActiveSectionChanges();
-        expect(getQuizSections()[0].section_title).toEqual('New Title');
-        expect(getQuizSections()[0].question_count).toEqual(99);
+        expect(get(quizSections)[0].section_title).toEqual('New Title');
+        expect(get(quizSections)[0].question_count).toEqual(99);
         set(activeSection, { section_id, section_title: 'New Title 2', question_count: 100 });
         // Be sure changes only reflect when saveActiveSectionChanges is called
-        expect(getQuizSections()[0].section_title).toEqual('New Title');
-        expect(getQuizSections()[0].question_count).toEqual(99);
+        expect(get(quizSections)[0].section_title).toEqual('New Title');
+        expect(get(quizSections)[0].question_count).toEqual(99);
       });
     });
   });

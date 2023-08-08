@@ -1,5 +1,5 @@
 import { get, set } from '@vueuse/core';
-import { ref, onMounted } from 'kolibri.lib.vueCompositionApi';
+import { computed, ref, onMounted } from 'kolibri.lib.vueCompositionApi';
 
 /**
  * ###
@@ -134,7 +134,7 @@ export function useQuiz() {
   function addSection() {
     const newSection = createSection();
     set(activeSection, newSection);
-    updateQuiz({ question_sources: [...getQuizSections(), newSection] });
+    updateQuiz({ question_sources: [...get(quizSections), newSection] });
     return newSection;
   }
 
@@ -142,7 +142,7 @@ export function useQuiz() {
    * @returns {QuizSection}        The new active section
    */
   function deleteSection(sectionId) {
-    const question_sources = getQuizSections().filter(s => s.section_id !== sectionId);
+    const question_sources = get(quizSections).filter(s => s.section_id !== sectionId);
     updateQuiz({ question_sources });
 
     if (question_sources.length > 0) {
@@ -157,25 +157,29 @@ export function useQuiz() {
   }
 
   /* @returns {QuizSection[]} */
-  function getQuizSections() {
+  const quizSections = computed(() => {
     return get(rootQuiz).question_sources;
-  }
+  });
 
   /*
    * @param {QuizSection} updates  The properties of activeSection to be updated
+   * @param {boolean}     save     Whether to save the changes to rootQuiz (default: false)
    * @throws {TypeError} when the given value does not match shape of QuizSection as defined above
    */
-  function updateActiveSection(updates) {
+  function updateActiveSection(updates, save = false) {
     if (!isQuizSection(updates)) {
       throw new TypeError(`Invalid QuizSection object: ${JSON.stringify(updates)}`);
     }
     set(activeSection, { ...get(activeSection), ...updates });
+    if (save) {
+      saveActiveSectionChanges();
+    }
   }
 
-  /* commits change to the active section to the rootQuiz object by updating rootQuiz */
+  /* Updates the rootQuiz so that the value of activeSection is applied to it's matching section */
   function saveActiveSectionChanges() {
     const activeSectionId = get(activeSection).section_id;
-    const question_sources = getQuizSections().map(s => {
+    const question_sources = get(quizSections).map(s => {
       if (s.section_id === activeSectionId) {
         return get(activeSection);
       }
@@ -209,7 +213,7 @@ export function useQuiz() {
     addSection,
     deleteSection,
     updateQuiz,
-    getQuizSections,
+    quizSections,
     _createQuiz,
     revertActiveSectionChanges,
     updateActiveSection,
