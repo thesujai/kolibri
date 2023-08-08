@@ -127,9 +127,9 @@ export function useQuizCreation() {
     set(_quiz, { ...get(_quiz), ...updates });
   }
 
-  // --------------------
-  // Questions management
-  // --------------------
+  // --------------------------------
+  // Questions / Exercises management
+  // --------------------------------
 
   /* @param {QuizQuestion} question
    * @affects _selectedQuestions - Adds question to _selectedQuestions if it isn't there already */
