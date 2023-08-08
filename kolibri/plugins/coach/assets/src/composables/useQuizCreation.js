@@ -62,6 +62,24 @@ export function isQuizSection(possibleSection) {
 }
 
 /*
+ * Perform a basic validation of a QuizSection object
+ * @param {QuizSection} section
+ * @throws {TypeError} If the section is not a valid QuizSection shaped object
+ * @returns QuizSection - This may not be the exact same object as is passed in as it will
+ *                        automatically update the `question_count` to match the length of the
+ *                        `questions` array. Other properties may be updated in the future.
+ */
+function validatedQuizSection(section) {
+  if (!isQuizSection(section)) {
+    throw new TypeError(`Invalid QuizSection object: ${JSON.stringify(section)}`);
+  }
+  return {
+    question_count: section.questions.length,
+    ...section,
+  };
+}
+
+/*
  * @typedef  {Object} QuizQuestion         A particular question in a Quiz
  * @property {string} exercise_id          The ID of the resource from which the question originates
  * @property {string} question_id          A *unique* identifier of this particular question within
@@ -170,7 +188,7 @@ export function useQuiz() {
     if (!isQuizSection(updates)) {
       throw new TypeError(`Invalid QuizSection object: ${JSON.stringify(updates)}`);
     }
-    set(activeSection, { ...get(activeSection), ...updates });
+    set(activeSection, validatedQuizSection({ ...get(activeSection), ...updates }));
     if (save) {
       saveActiveSectionChanges();
     }

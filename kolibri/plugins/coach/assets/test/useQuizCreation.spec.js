@@ -111,10 +111,18 @@ describe('useQuizCreation', () => {
       });
     });
 
-    it('Can update any value of the active quiz section', () => {
+    it('Can update any value of the active quiz section without saving it to rootQuiz', () => {
       expect(get(activeSection).section_title).toEqual(''); // Default
       updateActiveSection({ section_title: 'New Title' });
       expect(get(activeSection).section_title).toEqual('New Title');
+      expect(get(rootQuiz).question_sources[0].section_title).toEqual('');
+    });
+
+    it('Can update any value of the active quiz section while saving changes to rootQuiz', () => {
+      expect(get(activeSection).section_title).toEqual(''); // Default
+      updateActiveSection({ section_title: 'New Title' }, true);
+      expect(get(activeSection).section_title).toEqual('New Title');
+      expect(get(rootQuiz).question_sources[0].section_title).toEqual('New Title');
     });
 
     it('Will throw an error if you update it with something not shaped like a QuizSection', () => {
