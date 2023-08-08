@@ -5,7 +5,6 @@ import {
   activeSection,
   useQuiz,
   useQuizSection,
-  useActiveSection,
 } from '../src/composables/useQuizCreation.js';
 
 describe('Initialization', () => {
@@ -36,12 +35,12 @@ const {
   _createQuiz,
   addSection,
   deleteSection,
-  saveActiveSection,
+  saveActiveSectionChanges,
   getQuizSections,
   updateQuiz,
+  revertActiveSectionChanges,
+  updateActiveSection,
 } = useQuiz();
-
-const { revertActiveSectionChanges, updateActiveSection } = useActiveSection();
 
 function resetRootQuiz() {
   set(rootQuiz, _createQuiz());
@@ -102,11 +101,11 @@ describe('useQuizCreation', () => {
         expect(get(activeSection)).toEqual(section); // Be sure we're using the active section
         const { section_id } = section;
         set(activeSection, { section_id, section_title: 'New Title', question_count: 99 });
-        saveActiveSection();
+        saveActiveSectionChanges();
         expect(getQuizSections()[0].section_title).toEqual('New Title');
         expect(getQuizSections()[0].question_count).toEqual(99);
         set(activeSection, { section_id, section_title: 'New Title 2', question_count: 100 });
-        // Be sure changes only reflect when saveActiveSection is called
+        // Be sure changes only reflect when saveActiveSectionChanges is called
         expect(getQuizSections()[0].section_title).toEqual('New Title');
         expect(getQuizSections()[0].question_count).toEqual(99);
       });
@@ -128,7 +127,7 @@ describe('useQuizCreation', () => {
     it('Can reset all changes to the activeSection', () => {
       updateActiveSection({ section_title: 'Old Title' });
       expect(get(rootQuiz).question_sources[0].section_title).not.toEqual('Old Title');
-      saveActiveSection(); // Save the changes to rootQuiz
+      saveActiveSectionChanges(); // Save the changes to rootQuiz
       expect(get(rootQuiz).question_sources[0].section_title).toEqual('Old Title');
 
       // Now we're in a state where our activeSection is no longer the default values

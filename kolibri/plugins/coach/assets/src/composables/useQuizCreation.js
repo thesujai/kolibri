@@ -161,38 +161,6 @@ export function useQuiz() {
     return get(rootQuiz).question_sources;
   }
 
-  /* commits change to the active section to the rootQuiz object by updating rootQuiz */
-  function saveActiveSection() {
-    const activeSectionId = get(activeSection).section_id;
-    const question_sources = getQuizSections().map(s => {
-      if (s.section_id === activeSectionId) {
-        return get(activeSection);
-      }
-      return s;
-    });
-    updateQuiz({ question_sources });
-  }
-
-  // Initialize the rootQuiz object
-  onMounted(() => {
-    set(rootQuiz, _createQuiz());
-  });
-
-  return { addSection, deleteSection, saveActiveSection, updateQuiz, getQuizSections, _createQuiz };
-}
-
-/* A composable providing methods for updating and reading the activeSection - that is - the
- * section currently being edited by the user.
- *
- * This gives us the ability to make changes to the activeSection without committing them to the
- * rootQuiz object until the user is ready to save their changes.
- *
- * Note that this should not WRITE the rootQuiz object -- utilities for such behavior belong in
- * useQuiz()
- *
- * @affects {activeSection}
- */
-export function useActiveSection() {
   /*
    * @param {QuizSection} updates  The properties of activeSection to be updated
    * @throws {TypeError} when the given value does not match shape of QuizSection as defined above
@@ -202,6 +170,18 @@ export function useActiveSection() {
       throw new TypeError(`Invalid QuizSection object: ${JSON.stringify(updates)}`);
     }
     set(activeSection, { ...get(activeSection), ...updates });
+  }
+
+  /* commits change to the active section to the rootQuiz object by updating rootQuiz */
+  function saveActiveSectionChanges() {
+    const activeSectionId = get(activeSection).section_id;
+    const question_sources = getQuizSections().map(s => {
+      if (s.section_id === activeSectionId) {
+        return get(activeSection);
+      }
+      return s;
+    });
+    updateQuiz({ question_sources });
   }
 
   /* Returns the value of activeSection to its last saved value within rootQuiz, clearing changes
@@ -220,7 +200,21 @@ export function useActiveSection() {
     set(activeSection, originalSectionState);
   }
 
-  return { revertActiveSectionChanges, updateActiveSection };
+  // Initialize the rootQuiz object
+  onMounted(() => {
+    set(rootQuiz, _createQuiz());
+  });
+
+  return {
+    addSection,
+    deleteSection,
+    updateQuiz,
+    getQuizSections,
+    _createQuiz,
+    revertActiveSectionChanges,
+    updateActiveSection,
+    saveActiveSectionChanges,
+  };
 }
 
 export function useQuizSection() {
