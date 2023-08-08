@@ -222,6 +222,27 @@ export function useQuiz() {
     set(activeSection, originalSectionState);
   }
 
+  /* Updates a particular question's editable fields by ID within the activeSection and saves the
+   * change
+   * @affects {activeSection} */
+  function updateQuestion({ question_id, title }) {
+    const question = get(activeSection).questions.find(q => q.question_id == question_id);
+    if (!question) {
+      throw new Error(`No question found for ${question_id} - cannot apply updates.`);
+    }
+
+    // We only have one field to update right now; to avoid unwanted mutations, we'll do each
+    // writable property by hand (ie, we don't want to inadvertantly update question_id)
+    question.title = title;
+
+    updateActiveSection(
+      {
+        questions: get(activeSection).questions.map(q => (q.id === question_id ? question : q)),
+      },
+      true
+    );
+  }
+
   // Initialize the rootQuiz object
   onMounted(() => {
     set(rootQuiz, _createQuiz());
@@ -236,6 +257,7 @@ export function useQuiz() {
     revertActiveSectionChanges,
     updateActiveSection,
     saveActiveSectionChanges,
+    updateQuestion,
   };
 }
 

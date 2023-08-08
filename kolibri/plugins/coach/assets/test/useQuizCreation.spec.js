@@ -38,6 +38,7 @@ const {
   saveActiveSectionChanges,
   quizSections,
   updateQuiz,
+  updateQuestion,
   revertActiveSectionChanges,
   updateActiveSection,
 } = useQuiz();
@@ -144,5 +145,18 @@ describe('useQuizCreation', () => {
       revertActiveSectionChanges();
       expect(get(rootQuiz).question_sources[0].section_title).toEqual('Old Title');
     });
+  });
+
+  it('Can rename a particular question', () => {
+    updateActiveSection({
+      questions: [{ question_id: 1, title: 'Old Text', counter_in_exercise: 1 }],
+    });
+    updateQuestion({ question_id: 1, title: 'New Text' });
+    expect(get(activeSection).questions[0].title).toEqual('New Text');
+    // Be sure we've also updated the rootQuiz
+    expect(
+      get(rootQuiz).question_sources.find(q => q.section_id === get(activeSection).section_id)
+        .questions[0].title
+    ).toEqual('New Text');
   });
 });
