@@ -110,9 +110,7 @@ describe('useQuizCreation', () => {
         expect(get(quizSections)[0].question_count).toEqual(99);
       });
     });
-  });
 
-  describe('useActiveSection', () => {
     it('Can update any value of the active quiz section', () => {
       expect(get(activeSection).section_title).toEqual(''); // Default
       updateActiveSection({ section_title: 'New Title' });
