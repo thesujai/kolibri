@@ -452,6 +452,13 @@ def perform_ping(started, server=DEFAULT_SERVER_URL):
     return json.loads(response.content.decode() or "{}")
 
 
+def extract_error():
+    # error_reports = ErrorReport.objects.filter(sent=False)
+    # check for error reports in error_reports_logs.json file with sent as false and append to error_reports
+    # requests.post("https://telemetry.learningequality.org/api/v1/error", data=error_reports)
+    return "Done With Error Reporting"
+
+
 def perform_statistics(server, pingback_id):
     url = join_url(server, "/api/v1/statistics")
     channels = [extract_channel_statistics(c) for c in ChannelMetadata.objects.all()]
@@ -471,3 +478,4 @@ def ping_once(started, server=DEFAULT_SERVER_URL):
     if "id" in data:
         stat_data = perform_statistics(server, data["id"])
         create_and_update_notifications(stat_data, nutrition_endpoints.STATISTICS)
+    extract_error()
