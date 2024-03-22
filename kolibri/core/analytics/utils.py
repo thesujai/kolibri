@@ -456,6 +456,9 @@ def extract_error():
     # error_reports = ErrorReport.objects.filter(sent=False)
     # check for error reports in error_reports_logs.json file with sent as false and append to error_reports
     # requests.post("https://telemetry.learningequality.org/api/v1/error", data=error_reports)
+    # system_details = get_system_details() //will be done with the help of get_device_info()
+    # Post server(https://telemetry.learningequality.org) in new endpoint api/v1/error_report with errors_recorded and system_details
+    # Set sent flag true of the reported error
     return "Done With Error Reporting"
 
 
