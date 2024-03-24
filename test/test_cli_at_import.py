@@ -25,7 +25,7 @@ def test_status_no_db_access(create_engine_mock):
 
 
 @patch("sqlalchemy.create_engine")
-def test_stop_no_db_access(create_engine_mock):             
+def test_stop_no_db_access(create_engine_mock):
     """
     Tests that status does not try to access the database
     """

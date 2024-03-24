@@ -188,7 +188,7 @@ def _make_singleton(subclass):
     subclass.__new__ = new
 
 
-def define_hook(subclass=None, only_one_registered=False):   
+def define_hook(subclass=None, only_one_registered=False):
     """
     This method must be used as a decorator to define a new hook inheriting from
     the hook class that this is called from, this will return an abstract base
