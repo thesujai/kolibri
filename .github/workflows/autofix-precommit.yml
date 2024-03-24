@@ -45,11 +45,11 @@ jobs:
         run: |
           yarn --frozen-lockfile
           npm rebuild node-sass
-      - name: Run Pre-commit CI Lite
-        id: pre-commit-ci
-        uses: pre-commit-ci/lite-action@v1.0.2
+
+      - uses: pre-commit/action@v3.0.0
+      - uses: pre-commit-ci/lite-action@v1.0.2
       - name: Commit and push autofixed changes
-        if: steps.pre-commit-ci.outputs.status == 'success'
+        if: always()
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
