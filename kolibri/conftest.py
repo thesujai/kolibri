@@ -11,7 +11,7 @@ TEMP_KOLIBRI_HOME = "./.pytest_kolibri_home"
 def django_db_setup(
     request,
     django_db_setup,
-):
+):  
     def dispose_sqlalchemy():
         from kolibri.core.tasks.main import connection
 
