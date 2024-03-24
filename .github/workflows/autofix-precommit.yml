@@ -21,7 +21,7 @@ jobs:
   autofix:
     name: Autofix Pull Request Linting Errors
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && github.event_name == 'issue_comment' && github.event.comment && contains(github.event.comment.body, 'autofixme!') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.event_name == 'issue_comment' || github.event.comment || contains(github.event.comment.body, 'autofixme!') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
