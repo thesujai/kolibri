@@ -4,6 +4,7 @@ import shutil
 import pytest
 
 # referenced in pytest.ini
+# hi this is me
 TEMP_KOLIBRI_HOME = "./.pytest_kolibri_home"
 
 
@@ -21,7 +22,7 @@ def django_db_setup(
 
 
 @pytest.fixture(scope="session", autouse=True)
-def global_fixture():
+def global_fixture():  
     if not os.path.exists(TEMP_KOLIBRI_HOME):
         os.mkdir(TEMP_KOLIBRI_HOME)
     if not os.path.exists(os.path.join(TEMP_KOLIBRI_HOME, "content")):
