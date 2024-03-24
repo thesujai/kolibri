@@ -4,7 +4,7 @@ import shutil
 import pytest
 
 # referenced in pytest.ini
-TEMP_KOLIBRI_HOME = "./.pytest_kolibri_home"
+TEMP_KOLIBRI_HOME = "./.pytest_kolibri_home"        
 
 
 @pytest.fixture(scope="session")
