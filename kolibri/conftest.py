@@ -30,6 +30,6 @@ def global_fixture():
     if os.path.exists(TEMP_KOLIBRI_HOME):
         try:
             shutil.rmtree(TEMP_KOLIBRI_HOME)
-        except OSError:
+        except OSError:            
             # Don't fail a test just because we failed to cleanup
             pass
