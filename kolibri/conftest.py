@@ -3,7 +3,7 @@ import shutil
 
 import pytest
 
-# referenced in pytest.ini
+# referenced in pytest.ini okok
 TEMP_KOLIBRI_HOME = "./.pytest_kolibri_home"        
 
 
