@@ -18,7 +18,7 @@ def django_db_setup(
 
 
 
-        connection.dispose()
+        connection.dispose()                            
 
     request.addfinalizer(dispose_sqlalchemy)
 
