@@ -4,6 +4,7 @@ import shutil
 import pytest
 
 # referenced in pytest.ini
+# hi this is me
 TEMP_KOLIBRI_HOME = "./.pytest_kolibri_home"
 
 
