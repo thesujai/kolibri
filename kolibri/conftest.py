@@ -33,4 +33,4 @@ def global_fixture():
             shutil.rmtree(TEMP_KOLIBRI_HOME)
         except OSError:
             # Don't fail a test just because we failed to cleanup
-            pass                       
+            pass
