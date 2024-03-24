@@ -15,6 +15,9 @@ def django_db_setup(
     def dispose_sqlalchemy():
         from kolibri.core.tasks.main import connection
 
+
+
+
         connection.dispose()
 
     request.addfinalizer(dispose_sqlalchemy)
