@@ -19,12 +19,14 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const comment = github.context.payload.comment.body;
-            const isPR = github.context.payload.issue.pull_request != null;
-
-            if (isPR && comment.includes('/hello')) {
+            const payload = context.payload;
+            if (!payload.issue || !payload.issue.pull_request) {
+              console.log('Not a pull request. Skipping...');
+              return { should_skip: true };
+            }
+            const comment = payload.comment.body;
+            if (comment.includes('/hello')) {
               console.log('Skipping workflow execution as PR contains "/hello"');
-              // Set output to skip workflow execution
               return { should_skip: true };
             } else {
               console.log('No "/hello" comment found. Continuing workflow execution.');
