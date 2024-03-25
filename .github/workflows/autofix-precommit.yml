@@ -3,20 +3,40 @@ name: AutoFix PR
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
 
 jobs:
   pre_job:
-      name: Path match check
-      runs-on: ubuntu-latest
-      # Map a step output to a job output
-      outputs:
-        should_skip: ${{ steps.skip_check.outputs.should_skip }}
-      steps:
-        - id: skip_check
-          uses: fkirc/skip-duplicate-actions@master
-          with:
-            github_token: ${{ github.token }}
-            paths_ignore: '["**.po", "**.json"]'
+    name: Path match check
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - name: Check PR comment
+        id: check_comment
+        uses: actions/github-script@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const comment = github.context.payload.comment.body;
+            const isPR = github.context.payload.issue.pull_request != null;
+
+            if (isPR && comment.includes('/hello')) {
+              console.log('Skipping workflow execution as PR contains "/hello"');
+              // Set output to skip workflow execution
+              return { should_skip: true };
+            } else {
+              console.log('No "/hello" comment found. Continuing workflow execution.');
+              return { should_skip: false };
+            }
+
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
+        with:
+          github_token: ${{ github.token }}
+          paths_ignore: '["**.po", "**.json"]'
+        if: steps.check_comment.outputs.should_skip != 'true'
 
   autofix:
     name: Autofix Pull Request Linting Errors
@@ -24,6 +44,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -45,8 +67,6 @@ jobs:
         run: |
           yarn --frozen-lockfile
           npm rebuild node-sass
-
-      - uses: pre-commit/action@v3.0.0
       - uses: pre-commit-ci/lite-action@v1.0.2
       - name: Commit and push autofixed changes
         if: always()
@@ -55,4 +75,4 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add .
           git commit -m "Autofix linting errors"
-          git push origin lint-fix
+          git push origin ${{ github.head_ref }}
