@@ -1,77 +1,45 @@
-name: AutoFix PR
+name: AutoFix PR with Comment Trigger
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-  issue_comment:
-    types: [created]
+    types: [opened, synchronized, reopened]
 
 jobs:
-  pre_job:
-    name: Path match check
+  autofix:
+    name: Autofix Pull Request Linting Errors
     runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
       - name: Check PR comment
         id: check_comment
         uses: actions/github-script@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const payload = context.payload;
-            if (!payload.issue || !payload.issue.pull_request) {
+            const pullRequest = context.issue;
+            if (!pullRequest) {
               console.log('Not a pull request. Skipping...');
               return { should_skip: true };
             }
-            const comment = payload.comment.body;
-            if (comment.includes('/hello')) {
-              console.log('Skipping workflow execution as PR contains "/hello"');
+
+            const comments = pullRequest.comments;
+            if (!comments) {
+              console.log('No comments found. Skipping...');
               return { should_skip: true };
-            } else {
-              console.log('No "/hello" comment found. Continuing workflow execution.');
-              return { should_skip: false };
             }
 
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          github_token: ${{ github.token }}
-          paths_ignore: '["**.po", "**.json"]'
-        if: steps.check_comment.outputs.should_skip != 'true'
+            return {
+              should_skip: !comments.some(comment => comment.body.includes('/autofixme!'))
+            };
 
-  autofix:
-    name: Autofix Pull Request Linting Errors
-    needs: pre_job
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18.x'
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-      - name: Cache Node.js modules
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-      - name: Install dependencies
-        run: |
-          yarn --frozen-lockfile
-          npm rebuild node-sass
       - uses: pre-commit-ci/lite-action@v1.0.2
-      - name: Commit and push autofixed changes
-        if: always()
+        if: steps.check_comment.outputs.should_skip == 'false'
+
+      - name: Commit and push autofixed changes (Optional)
+        if: always()  # Uncomment to commit and push changes
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
