@@ -3,11 +3,15 @@ name: AutoFix PR
 on:
   pull_request:
     types: [closed]
+    branches:
+      - develop
+      - 'release-v*'
 
 jobs:
   autofix:
     name: Autofix Pull Request Linting Errors
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,6 +47,8 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          target_branch=${{ github.event.pull_request.base.ref }}
+          git checkout $target_branch
           git add .
           git commit -m "Autofix linting errors" || echo "No changes to commit"
-          git push origin ${{ github.head_ref }}
+          git push origin $target_branch || echo "No changes to push"
