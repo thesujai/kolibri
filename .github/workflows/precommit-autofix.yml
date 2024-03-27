@@ -38,7 +38,7 @@ jobs:
       - name: Autofix linting errors
         run: |
           pre-commit install
-          pre-commit run --all-files
+          pre-commit run --all-files || true
       - name: Commit and push autofixed changes
         run: |
           git config --global user.name 'github-actions[bot]'
