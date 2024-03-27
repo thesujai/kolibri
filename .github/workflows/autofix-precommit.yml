@@ -34,7 +34,7 @@ jobs:
           yarn --frozen-lockfile
           npm rebuild node-sass
       - name: Run pre-commit hook
-        uses: pre-commit-ci/action@v3.0.0
+        uses: pre-commit/action@v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Check if any files were modified
