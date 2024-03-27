@@ -2,28 +2,16 @@ name: AutoFix PR
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [closed]
 
 jobs:
-  pre_job:
-      name: Path match check
-      runs-on: ubuntu-latest
-      # Map a step output to a job output
-      outputs:
-        should_skip: ${{ steps.skip_check.outputs.should_skip }}
-      steps:
-        - id: skip_check
-          uses: fkirc/skip-duplicate-actions@master
-          with:
-            github_token: ${{ github.token }}
-            paths_ignore: '["**.po", "**.json"]'
-
   autofix:
     name: Autofix Pull Request Linting Errors
-    needs: pre_job
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -45,14 +33,28 @@ jobs:
         run: |
           yarn --frozen-lockfile
           npm rebuild node-sass
-
-      - uses: pre-commit/action@v3.0.0
-      - uses: pre-commit-ci/lite-action@v1.0.2
+      - name: Run pre-commit hook
+        uses: pre-commit-ci/action@v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check if any files were modified
+        id: was_modified
+        run: |
+          modified_files=$(git diff --name-only HEAD^ HEAD)
+          if [ -z "$modified_files" ]; then
+            echo "No files were modified."
+            echo "::set-output name=modified::false"
+          else
+            echo "Files were modified:"
+            echo "$modified_files"
+            echo "::set-output name=modified::true"
+          fi
       - name: Commit and push autofixed changes
-        if: always()
+        if: steps.was_modified.outputs.modified == 'true'
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add .
           git commit -m "Autofix linting errors"
-          git push origin HEAD:${{ github.head_ref }} -f
+          git push origin ${{ github.head_ref }}
+
