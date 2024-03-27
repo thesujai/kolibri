@@ -92,7 +92,7 @@ INSTALLED_APPS = [
     "django_js_reverse",
     "jsonfield",
     "morango",
-]                            
+]
 
 MIDDLEWARE = [
     "kolibri.core.analytics.middleware.cherrypy_access_log_middleware",
@@ -110,7 +110,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.cache.FetchFromCacheMiddleware",
 ]
-                         
+
 # By default don't cache anything unless it explicitly requests it to!
 CACHE_MIDDLEWARE_SECONDS = 0
 
