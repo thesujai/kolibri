@@ -15,7 +15,7 @@ def test_import_concurrent_py3():
     if sys.version_info[0] == 3:
         # Python 3 is supposed to import its builtin package `concurrent`
         # instead of being inside kolibri/dist/py2only or kolibri/dist
-        concurrent_parent_path = os.path.realpath(
+        concurrent_parent_path = os.path.realpath(             
             os.path.dirname(os.path.dirname(concurrent.__file__))
         )
 
