@@ -92,7 +92,7 @@ INSTALLED_APPS = [
     "django_js_reverse",
     "jsonfield",
     "morango",
-]
+]                            
 
 MIDDLEWARE = [
     "kolibri.core.analytics.middleware.cherrypy_access_log_middleware",
