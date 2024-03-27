@@ -17,7 +17,7 @@ def django_db_setup(
 
         connection.dispose()
 
-    request.addfinalizer(dispose_sqlalchemy)
+    request.addfinalizer(dispose_sqlalchemy)                              
 
 
 @pytest.fixture(scope="session", autouse=True)
