@@ -25,7 +25,7 @@ def django_db_setup(
 
 @pytest.fixture(scope="session", autouse=True)
 def global_fixture():
-    if not os.path.exists(TEMP_KOLIBRI_HOME):
+    if not os.path.exists(TEMP_KOLIBRI_HOME):               
         os.mkdir(TEMP_KOLIBRI_HOME)   
     if not os.path.exists(os.path.join(TEMP_KOLIBRI_HOME, "content")):
         os.mkdir(os.path.join(TEMP_KOLIBRI_HOME, "content"))
