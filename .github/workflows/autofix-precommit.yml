@@ -1,7 +1,8 @@
-name: AutoFix PR with Comment Trigger
+name: AutoFix PR
 
 on:
   pull_request:
+    types: [closed]
 
 jobs:
   autofix:
@@ -11,34 +12,45 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
-
-      - name: Check PR comment
-        id: check_comment
-        uses: actions/github-script@v4
+      - uses: actions/setup-python@v5
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const pullRequest = context.issue;
-            if (!pullRequest) {
-              console.log('Not a pull request. Skipping...');
-              return { should_skip: true };
-            }
-
-            const comments = pullRequest.comments;
-            if (!comments) {
-              console.log('No comments found. Skipping...');
-              return { should_skip: true };
-            }
-
-            return {
-              should_skip: !comments.some(comment => comment.body.includes('/autofixme!'))
-            };
-
-      - uses: pre-commit-ci/lite-action@v1.0.2
-        if: steps.check_comment.outputs.should_skip == 'false'
-
-      - name: Commit and push autofixed changes (Optional)
-        if: always()  # Uncomment to commit and push changes
+          python-version: '3.11'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - name: Cache Node.js modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Install dependencies
+        run: |
+          yarn --frozen-lockfile
+          npm rebuild node-sass
+      - name: Run pre-commit hook
+        uses: pre-commit-ci/action@v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check if any files were modified
+        id: was_modified
+        run: |
+          modified_files=$(git diff --name-only HEAD^ HEAD)
+          if [ -z "$modified_files" ]; then
+            echo "No files were modified."
+            echo "::set-output name=modified::false"
+          else
+            echo "Files were modified:"
+            echo "$modified_files"
+            echo "::set-output name=modified::true"
+          fi
+      - name: Commit and push autofixed changes
+        if: steps.was_modified.outputs.modified == 'true'
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
