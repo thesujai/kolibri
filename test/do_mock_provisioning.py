@@ -8,8 +8,8 @@ import requests
 from kolibri.core.auth.constants.demographics import NOT_SPECIFIED
 
 logger = logging.getLogger(__name__)
-
-url = "http://localhost:8082/api/device/deviceprovision/"
+ 
+url = "http://localhost:8082/api/device/deviceprovision/"              
 data = {
     "device_name": "localhost",
     "language_id": "en",
