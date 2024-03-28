@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from django.contrib.auth import authenticate
 from django.contrib.auth import login
-from django.contrib.auth import logout                                                        
+from django.contrib.auth import logout
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ObjectDoesNotExist
