@@ -453,7 +453,8 @@ def perform_ping(started, server=DEFAULT_SERVER_URL):
 
 
 def extract_error():
-    # error_reports = ErrorReport.objects.filter(sent=False)
+    from error_reporting.db_utils import get_unsent_errors
+    # error_reports = get_unsent_errors()
     # check for error reports in error_reports_logs.json file with sent as false and append to error_reports
     # requests.post("https://telemetry.learningequality.org/api/v1/error", data=error_reports)
     # system_details = get_system_details() //will be done with the help of get_device_info()
@@ -481,4 +482,5 @@ def ping_once(started, server=DEFAULT_SERVER_URL):
     if "id" in data:
         stat_data = perform_statistics(server, data["id"])
         create_and_update_notifications(stat_data, nutrition_endpoints.STATISTICS)
-    extract_error()
+    if not conf.OPTIONS["Deployment"]["DISABLE_ERROR_REPORT"]:
+        extract_error()

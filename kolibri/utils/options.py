@@ -577,6 +577,11 @@ base_option_spec = {
             "default": False,
             "description": "Turn off the statistics pingback. This will also disable update notifications",
         },
+        "DISABLE_ERROR_REPORTING": {
+            "type": "boolean",
+            "default": False,
+            "description": "Turn off the Error Report pingback",
+        },
         "URL_PATH_PREFIX": {
             "type": "url_prefix",
             "default": "/",
