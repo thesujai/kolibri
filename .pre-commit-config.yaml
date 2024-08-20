@@ -77,6 +77,13 @@ repos:
     hooks:
     -   id: teyit
         language_version: python3
+-   repo: local
+    hooks:
+    -   id: authors
+        name: authors
+        entry: python update_authors.py
+        language: system
+        files: AUTHORS.md
 # Always keep black as the final hook so it reformats any other reformatting.
 -   repo: https://github.com/python/black
     rev: 20.8b1
