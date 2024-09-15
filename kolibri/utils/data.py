@@ -10,13 +10,13 @@ def bytes_for_humans(size, suffix="B"):
     """
     Function to get bytes in more human readable format, untranslated, for logging purposes only.
     :type size: int
-    :type suffix: str
+    :type suffix: str int
     :rtype: str
     """
     for prefix in BYTES_PREFIXES[:-1]:
         if size < PREFIX_FACTOR_BYTES:
             if prefix == "":
-                return "{}{}".format(size, suffix)
+                return "{}{}".format(size, suffix)                                                    
             return "{:.2f}{}{}".format(size, prefix, suffix)
         size /= PREFIX_FACTOR_BYTES
     return "{:.2f}{}{}".format(size, "P", suffix)
