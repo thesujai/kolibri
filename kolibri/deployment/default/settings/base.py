@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 import os
 import sys
 from urllib.parse import urljoin
+import sentry_sdk
+import sentry_sdk.transport
+from sentry_sdk.integrations.django import DjangoIntegration
 
 import pytz
 from django.conf import locale
@@ -43,6 +46,16 @@ if not os.path.exists(conf.KOLIBRI_HOME):
 # import kolibri, so we can get the path to the module.
 # we load other utilities related to i18n
 # This is essential! We load the kolibri conf INSIDE the Django conf
+class KolibriTransport(sentry_sdk.transport.Transport):
+
+    def capture_envelope(self, envelope):
+        error_details = envelope.get_event()
+
+        if error_details:
+            import json
+            print(json.dumps(error_details, indent=2))
+            with open("sentry_logs.json", "w") as f:
+                f.write(json.dumps(error_details, indent=2))
 
 KOLIBRI_MODULE_PATH = os.path.dirname(kolibri.__file__)
 
@@ -474,3 +487,12 @@ else:
 # Always allow 'self' and 'data' sources to allow for the kind of
 # iframe manipulation needed for epub.js.
 CSP_FRAME_SRC = CSP_DEFAULT_SRC + frame_src
+
+
+sentry_sdk.init(
+    dsn=None,
+    transport=KolibriTransport(),
+    integrations=[
+        DjangoIntegration(),
+    ],
+)
