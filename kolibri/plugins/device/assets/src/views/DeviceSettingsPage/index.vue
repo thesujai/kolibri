@@ -289,7 +289,7 @@
       </section>
 
       <!-- List of separate links to Facility Settings pages -->
-      <section v-if="isMultiFacilitySuperuser">
+      <section v-if="isMultiFacilitySuperuser && getFacilitySettingsPath()">
         <h2>{{ $tr('configureFacilitySettingsHeader') }}</h2>
         <ul class="ul-reset">
           <template>

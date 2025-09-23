@@ -4,10 +4,6 @@
     v-if="activeSection"
     class="section-settings-content"
   >
-    <h1>
-      {{ coreString('editAction') + ' - ' + sectionOrderLabel$() }}
-    </h1>
-
     <DragContainer
       v-if="sectionOrderList.length > 0"
       :items="sectionOrderList"
@@ -28,8 +24,6 @@
             >
               <DragSortWidget
                 class="drag-title"
-                :moveUpText="upLabel$"
-                :moveDownText="downLabel$"
                 :noDrag="true"
                 :isFirst="index === 0"
                 :isLast="index === sectionOrderList.length - 1"
@@ -97,7 +91,6 @@
   import DragContainer from 'kolibri-common/components/sortable/DragContainer';
   import DragHandle from 'kolibri-common/components/sortable/DragHandle';
   import DragSortWidget from 'kolibri-common/components/sortable/DragSortWidget';
-  import { searchAndFilterStrings } from 'kolibri-common/strings/searchAndFilterStrings';
   import { PageNames } from '../../../../../constants/index';
   import { coachStrings } from '../../../../common/commonCoachStrings.js';
   import { injectQuizCreation } from '../../../../../composables/useQuizCreation.js';
@@ -113,13 +106,11 @@
     },
     mixins: [commonCoreStrings],
     setup(_, context) {
-      const { applySettings$, sectionOrderLabel$, currentSection$ } = enhancedQuizManagementStrings;
+      const { applySettings$, currentSection$ } = enhancedQuizManagementStrings;
 
       const { closeConfirmationTitle$, closeConfirmationMessage$ } = coachStrings;
 
       const { activeSectionIndex, activeSection, allSections, updateQuiz } = injectQuizCreation();
-
-      const { upLabel$, downLabel$ } = searchAndFilterStrings;
 
       const { moveDownOne, moveUpOne } = useDrag();
 
@@ -167,12 +158,9 @@
         moveUpOne,
         // i18n
         currentSection$,
-        sectionOrderLabel$,
         applySettings$,
         closeConfirmationTitle$,
         closeConfirmationMessage$,
-        upLabel$,
-        downLabel$,
       };
     },
     computed: {

@@ -42,7 +42,7 @@ jest.mock('kolibri-common/composables/useChannels');
 jest.mock('../../src/composables/useCardLayoutSpan');
 jest.mock('../../src/composables/useDevices');
 jest.mock('../../src/composables/useLearnerResources');
-jest.mock('../../src/composables/useLearningActivities');
+jest.mock('kolibri-common/composables/useLearningActivities');
 jest.mock('../../src/composables/useContentLink');
 jest.mock('../../src/composables/usePinnedDevices');
 jest.mock('kolibri-common/composables/useBaseSearch');
@@ -55,13 +55,6 @@ async function makeWrapper({ options, fullMount = false } = {}) {
   const store = new Store({
     state: { core: { loading: false } },
     getters: {
-      isUserLoggedIn: jest.fn(),
-      isLearner: jest.fn(),
-      isSuperuser: jest.fn(),
-      isAdmin: jest.fn(),
-      isCoach: jest.fn(),
-      isAppContext: jest.fn(),
-      getUserKind: jest.fn(),
       isPageLoading: jest.fn(),
       pageSessionId: jest.fn(() => 0),
     },
@@ -147,7 +140,7 @@ describe('LibraryPage', () => {
     });
   });
 
-  describe('displaying channels and recent/popular content ', () => {
+  describe('displaying channels and recent/popular content', () => {
     beforeAll(() => {
       useBaseSearch.mockImplementation(() => useBaseSearchMock({ displayingSearchResults: false }));
     });
@@ -179,6 +172,8 @@ describe('LibraryPage', () => {
     it('display when no channels are available', async () => {
       const wrapper = await makeWrapper({ rootNodes: [] });
       await wrapper.setData({ isLocalLibraryEmpty: true });
+      await wrapper.setData({ isNetworkLibraryAvailable: true });
+      await wrapper.setData({ isLoadingNetworkLibraries: false });
       expect(wrapper.find('[data-test="channels"').element).toBeTruthy();
       expect(wrapper.find('[data-test="nothing-in-lib-label"').element).toBeTruthy();
     });

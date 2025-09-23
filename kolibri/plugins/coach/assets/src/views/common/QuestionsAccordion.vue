@@ -56,7 +56,8 @@
           }"
         >
           <AccordionItem
-            :title="displayQuestionTitle(question, getQuestionContent(question).title)"
+            :title="getDisplayQuestionTitle(question, getQuestionContent(question)?.title)"
+            :disabledTitle="questionItemsToReplace?.includes(question.item)"
             :aria-selected="questionIsChecked(question)"
             :headerAppearanceOverrides="{
               userSelect: dragActive ? 'none !important' : 'text',
@@ -66,8 +67,6 @@
               <DragHandle v-if="isSortable">
                 <div>
                   <DragSortWidget
-                    :moveUpText="upLabel$"
-                    :moveDownText="downLabel$"
                     :noDrag="true"
                     :isFirst="index === 0"
                     :isLast="index === questions.length - 1"
@@ -86,17 +85,25 @@
                 "
               />
             </template>
+            <template #trailing-actions>
+              <span v-if="questionItemsToReplace?.includes(question.item)">
+                {{ replacingThisQuestionLabel$() }}
+              </span>
+              <slot
+                name="question-trailing-actions"
+                :question="question"
+              ></slot>
+            </template>
             <template #content>
               <div
                 :id="`question-panel-${question.item}`"
                 :style="{ userSelect: dragActive ? 'none !important' : 'text' }"
               >
-                <ContentRenderer
+                <ContentViewer
+                  v-if="getQuestionContent(question)"
                   :ref="`contentRenderer-${question.item}`"
-                  :kind="getQuestionContent(question).kind"
                   :lang="getQuestionContent(question).lang"
                   :files="getQuestionContent(question).files"
-                  :available="getQuestionContent(question).available"
                   :itemId="question.question_id"
                   :assessment="true"
                   :allowHints="false"
@@ -107,6 +114,13 @@
                   @updateContentState="() => null"
                   @error="err => $emit('error', err)"
                 />
+                <div v-else>
+                  <KIcon
+                    icon="warning"
+                    :style="{ fill: $themePalette.yellow.v_600 }"
+                  />
+                  {{ coreString('resourceNotFoundOnDevice') }}
+                </div>
                 <slot
                   name="questionExtraContent"
                   :question="question"
@@ -125,17 +139,14 @@
 <script>
 
   import { computed, ref } from 'vue';
-  import {
-    enhancedQuizManagementStrings,
-    displayQuestionTitle,
-  } from 'kolibri-common/strings/enhancedQuizManagementStrings';
+  import { enhancedQuizManagementStrings } from 'kolibri-common/strings/enhancedQuizManagementStrings';
   import Draggable from 'kolibri-common/components/sortable/Draggable';
   import DragHandle from 'kolibri-common/components/sortable/DragHandle';
   import DragContainer from 'kolibri-common/components/sortable/DragContainer';
   import DragSortWidget from 'kolibri-common/components/sortable/DragSortWidget';
   import AccordionItem from 'kolibri-common/components/accordion/AccordionItem';
+  import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
   import AccordionContainer from 'kolibri-common/components/accordion/AccordionContainer';
-  import { searchAndFilterStrings } from 'kolibri-common/strings/searchAndFilterStrings';
   import useDrag from './useDrag.js';
 
   export default {
@@ -148,16 +159,21 @@
       AccordionItem,
       AccordionContainer,
     },
+    mixins: [commonCoreStrings],
     setup(props) {
       const dragActive = ref(false);
 
-      const { upLabel$, downLabel$ } = searchAndFilterStrings;
-      const { selectAllLabel$, expandAll$, collapseAll$ } = enhancedQuizManagementStrings;
+      const { selectAllLabel$, expandAll$, collapseAll$, replacingThisQuestionLabel$ } =
+        enhancedQuizManagementStrings;
 
       const { moveUpOne, moveDownOne } = useDrag();
 
       function questionCheckboxDisabled(question) {
-        if (props.disabled || props.unselectableQuestionItems?.includes(question.item)) {
+        if (
+          props.disabled ||
+          props.unselectableQuestionItems?.includes(question.item) ||
+          props.questionItemsToReplace?.includes(question.item)
+        ) {
           return true;
         }
         if (
@@ -170,6 +186,9 @@
       }
 
       function questionIsChecked(question) {
+        if (props.questionItemsToReplace?.includes(question.item)) {
+          return false;
+        }
         if (props.unselectableQuestionItems?.includes(question.item)) {
           return true;
         }
@@ -230,14 +249,12 @@
         moveUpOne,
         moveDownOne,
         questionIsChecked,
-        displayQuestionTitle,
         questionCheckboxDisabled,
 
-        upLabel$,
-        downLabel$,
         selectAllLabel$,
         expandAll$,
         collapseAll$,
+        replacingThisQuestionLabel$,
       };
     },
     props: {
@@ -279,6 +296,15 @@
        * and should not be selectable.
        */
       unselectableQuestionItems: {
+        type: Array,
+        required: false,
+        default: null,
+      },
+      /**
+       * If provided, the question with this item will appear as disabled
+       * and with a `Replacing this question` message.
+       */
+      questionItemsToReplace: {
         type: Array,
         required: false,
         default: null,
@@ -326,6 +352,9 @@
             this.selectableQuestions.map(question => question.item),
           );
         }
+      },
+      getDisplayQuestionTitle(question, title) {
+        return title || this.coreString('resourceNotFoundOnDevice');
       },
     },
   };

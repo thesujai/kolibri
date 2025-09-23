@@ -20,6 +20,7 @@
             >
               <template #menu>
                 <KDropdownMenu
+                  v-if="!showSyncAllModal"
                   :options="options"
                   @select="handleSelect"
                 />

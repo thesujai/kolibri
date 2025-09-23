@@ -18,7 +18,6 @@ function makeWrapper({ getters, options, fullMount = false } = {}) {
   const store = new Store({
     state: { core: { loading: false } },
     getters: {
-      isSuperuser: jest.fn(),
       ...getters,
     },
   });

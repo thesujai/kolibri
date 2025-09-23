@@ -33,7 +33,6 @@
         :progress="contentProgress"
         class="progress-icon"
       />
-
       <template #icon>
         <KIconButton
           icon="back"
@@ -110,7 +109,10 @@
           :deviceId="deviceId"
         />
 
-        <TransitionGroup name="bar-actions">
+        <TransitionGroup
+          name="bar-actions"
+          data-onboarding-id="contentPageTopBar"
+        >
           <KIconButton
             v-for="action in barActions"
             :key="action.id"
@@ -172,6 +174,11 @@
         </span>
       </template>
     </KToolbar>
+    <TooltipTour
+      v-if="tourActive && isTourActive('LearningActivityBarPage') && isLearner"
+      page="LearningActivityBarPage"
+      @tourEnded="endTour()"
+    />
   </nav>
 
 </template>
@@ -192,8 +199,11 @@
   import SuggestedTime from 'kolibri-common/components/SuggestedTime';
   import get from 'lodash/get';
   import LearningActivityIcon from 'kolibri-common/components/ResourceDisplayAndSearch/LearningActivityIcon.vue';
-  import commonLearnStrings from './commonLearnStrings';
+  import TooltipTour from 'kolibri/components/onboarding/TooltipTour';
+  import useTour from 'kolibri/composables/useTour';
+  import useUser from 'kolibri/composables/useUser';
   import DeviceConnectionStatus from './DeviceConnectionStatus.vue';
+  import commonLearnStrings from './commonLearnStrings';
 
   export default {
     name: 'LearningActivityBar',
@@ -207,6 +217,7 @@
       TimeDuration,
       SuggestedTime,
       DeviceConnectionStatus,
+      TooltipTour,
     },
     filters: {
       truncateText(value, maxLength) {
@@ -219,8 +230,15 @@
     mixins: [commonLearnStrings, commonCoreStrings],
     setup() {
       const { windowBreakpoint } = useKResponsiveWindow();
+      const { tourActive, isTourActive, startTour, endTour } = useTour();
+      const { isLearner } = useUser();
       return {
         windowBreakpoint,
+        tourActive,
+        isTourActive,
+        startTour,
+        endTour,
+        isLearner,
       };
     },
     /**
@@ -482,6 +500,11 @@
     beforeDestroy() {
       window.removeEventListener('click', this.onWindowClick);
     },
+    mounted() {
+      this.$nextTick(() => {
+        this.startTour('LearningActivityBarPage');
+      });
+    },
     methods: {
       closeMenu({ focusMoreOptionsButton = true } = {}) {
         this.isMenuOpen = false;
@@ -597,35 +620,29 @@
   }
 
   /*
-  Make truncation via text ellipsis work well in UIToolbar's body flex item:
+  Make truncation via text ellipsis work well in KToolbar's default slot:
   By default, `min-width` is `auto`  for a flex item which means it
   cannot be smaller than the size of its content which causes the whole
   title being visible even in cases when it should be already truncated.
   Overriding it to `0` allows the title to be shrinked and then truncated
-  properly. Labeled icon wrapper needs to have this set too for its parent
-  flex item to shrink.
+  properly.
 */
-  /deep/ .ui-toolbar__body,
   /deep/ .labeled-icon-wrapper {
     min-width: 0;
   }
 
-  /deep/ .ui-toolbar__left {
+  /deep/ .k-toolbar-left {
     margin-left: 5px;
     overflow: hidden;
   }
 
-  /deep/ .ui-toolbar__right {
+  /deep/ .k-toolbar-right {
     display: flex;
   }
 
-  /deep/ .ui-toolbar__nav-icon {
+  /deep/ .k-toolbar-nav-icon {
+    min-width: 0; // avoids early resource title truncation on Safari and Mac
     margin-left: 0; // prevents icon cutoff
-  }
-
-  /deep/ .ui-toolbar__body {
-    flex-grow: 0; // make sure that the completion icon is right next to the title
-    align-items: center;
   }
 
   /deep/ .progress-icon .ui-icon {

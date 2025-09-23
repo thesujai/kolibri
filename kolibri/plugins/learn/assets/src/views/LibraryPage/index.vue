@@ -49,16 +49,31 @@
           v-else-if="!displayingSearchResults && !rootNodesLoading"
           data-test="channels"
         >
-          <h1 class="channels-label">
-            {{ channelsLabel }}
-          </h1>
-          <p
-            v-if="isLocalLibraryEmpty"
-            data-test="nothing-in-lib-label"
-            class="nothing-in-lib-label"
-          >
-            {{ coreString('nothingInLibraryLearner') }}
-          </p>
+          <div>
+            <h1
+              v-if="!isLocalLibraryEmpty"
+              class="channels-label"
+            >
+              {{ channelsLabel }}
+            </h1>
+            <div
+              v-else-if="
+                isLocalLibraryEmpty && isNetworkLibraryAvailable && !isLoadingNetworkLibraries
+              "
+            >
+              <h1 class="channels-label">
+                {{ channelsLabel }}
+              </h1>
+              <p
+                data-test="nothing-in-lib-label"
+                class="nothing-in-lib-label"
+              >
+                {{ coreString('nothingInLibraryLearner') }}
+              </p>
+            </div>
+            <NoResourcePage v-else />
+          </div>
+
           <ChannelCardGroupGrid
             v-if="!isLocalLibraryEmpty"
             data-test="channel-cards"
@@ -80,6 +95,8 @@
             v-if="showOtherLibraries"
             data-test="other-libraries"
             :injectedtr="injecttr"
+            @availableNetworkDevices="availableNetworkDevices"
+            @isLoadingLibraries="isLoadingLibraries"
           />
         </div>
 
@@ -102,7 +119,7 @@
       </main>
 
       <!-- Side Panels for filtering and searching  -->
-      <div v-if="(!isLocalLibraryEmpty || deviceId) && windowIsLarge">
+      <div v-if="(!isLocalLibraryEmpty || deviceId) && windowIsLarge && !rootNodesLoading">
         <SearchFiltersPanel
           ref="sidePanel"
           v-model="searchTerms"
@@ -127,7 +144,7 @@
 
       <!-- Side Panel for metadata -->
       <SidePanelModal
-        v-if="metadataSidePanelContent"
+        v-if="metadataSidePanelContent && !rootNodesLoading"
         data-test="side-panel-modal"
         alignment="right"
         @closePanel="metadataSidePanelContent = null"
@@ -167,6 +184,11 @@
           :canDownloadExternally="canDownloadExternally && !deviceId"
         />
       </SidePanelModal>
+      <TooltipTour
+        v-if="tourActive && isTourActive('LibraryPage') && !isLearner"
+        page="LibraryPage"
+        @tourEnded="endTour('LibraryPage')"
+      />
     </LearnAppBarPage>
   </div>
 
@@ -191,6 +213,8 @@
   import SidePanelModal from 'kolibri-common/components/SidePanelModal';
   import SearchFiltersPanel from 'kolibri-common/components/SearchFiltersPanel';
   import useChannels from 'kolibri-common/composables/useChannels';
+  import TooltipTour from 'kolibri/components/onboarding/TooltipTour';
+  import useTour from 'kolibri/composables/useTour';
   import { KolibriStudioId, PageNames } from '../../constants';
   import useCardViewStyle from '../../composables/useCardViewStyle';
   import useContentLink from '../../composables/useContentLink';
@@ -211,6 +235,7 @@
   import PostSetupModalGroup from '../../../../../device/assets/src/views/PostSetupModalGroup.vue';
   import ResumableContentGrid from './ResumableContentGrid';
   import OtherLibraries from './OtherLibraries';
+  import NoResourcePage from './NoResourcePage';
 
   const welcomeDismissalKey = 'DEVICE_WELCOME_MODAL_DISMISSED';
 
@@ -233,21 +258,17 @@
       LearnAppBarPage,
       OtherLibraries,
       PostSetupModalGroup,
+      NoResourcePage,
+      TooltipTour,
     },
     mixins: [commonLearnStrings, commonCoreStrings],
     setup(props) {
       const currentInstance = getCurrentInstance().proxy;
       const store = currentInstance.$store;
       const router = currentInstance.$router;
+      const { tourActive, isTourActive, startTour, endTour, resumeTour } = useTour();
+      const { isUserLoggedIn, isCoach, isAdmin, isSuperuser, isLearner, user_id } = useUser();
 
-      const {
-        isUserLoggedIn,
-        isCoach,
-        isAdmin,
-        isSuperuser,
-        canManageContent,
-        isLearnerOnlyImport,
-      } = useUser();
       const { allowDownloadOnMeteredConnection } = useDeviceSettings();
       const {
         searchTerms,
@@ -333,10 +354,6 @@
 
       function _showLibrary(baseurl) {
         return fetchChannels({ baseurl }).then(channels => {
-          if (!channels.length && isUserLoggedIn) {
-            router.replace({ name: PageNames.CONTENT_UNAVAILABLE });
-            return;
-          }
           if (!channels.length && baseurl) {
             router.replace({ name: PageNames.LIBRARY });
             return;
@@ -411,8 +428,13 @@
         rootNodesLoading,
         rootNodes,
         isUserLoggedIn,
-        canManageContent,
-        isLearnerOnlyImport,
+        isLearner,
+        tourActive,
+        isTourActive,
+        startTour,
+        endTour,
+        resumeTour,
+        userId: user_id,
       };
     },
     props: {
@@ -427,6 +449,8 @@
         metadataSidePanelContent: null,
         mobileSidePanelIsOpen: false,
         usingMeteredConnection: true,
+        isNetworkLibraryAvailable: true,
+        isLoadingNetworkLibraries: true,
       };
     },
     computed: {
@@ -442,10 +466,7 @@
       welcomeModalVisible() {
         return (
           this.welcomeModalVisibleState &&
-          window.localStorage.getItem(welcomeDismissalKey) !== 'true' &&
-          !(this.rootNodes.length > 0) &&
-          this.canManageContent &&
-          !this.isLearnerOnlyImport
+          window.localStorage.getItem(`${welcomeDismissalKey}-${this.userId}`) !== 'true'
         );
       },
       showOtherLibraries() {
@@ -494,6 +515,9 @@
       studioId() {
         return KolibriStudioId;
       },
+      loading() {
+        return this.$store.state.core.loading;
+      },
     },
     watch: {
       rootNodes(newNodes) {
@@ -517,11 +541,21 @@
         }
         document.documentElement.style.position = '';
       },
+      loading(newVal, oldVal) {
+        if (oldVal && !newVal) {
+          const isTourStarted = this.resumeTour(this.userId, 'LibraryPage');
+          if (isTourStarted) {
+            setTimeout(() => {
+              this.startTour('LibraryPage');
+            }, 3000);
+          }
+        }
+      },
     },
     created() {
       const welcomeDismissalKey = 'DEVICE_WELCOME_MODAL_DISMISSED';
 
-      if (window.sessionStorage.getItem(welcomeDismissalKey) !== 'true') {
+      if (window.sessionStorage.getItem(`${welcomeDismissalKey}-${this.userId}`) !== 'true') {
         this.$store.commit('SET_WELCOME_MODAL_VISIBLE', true);
       }
 
@@ -539,8 +573,9 @@
     },
     methods: {
       hideWelcomeModal() {
-        window.localStorage.setItem(welcomeDismissalKey, true);
+        window.localStorage.setItem(`${welcomeDismissalKey}-${this.userId}`, true);
         this.$store.commit('SET_WELCOME_MODAL_VISIBLE', false);
+        this.startTour('LibraryPage');
       },
       findFirstEl() {
         this.$refs.resourcePanel.focusFirstEl();
@@ -550,6 +585,12 @@
       },
       injecttr(...args) {
         return this.$tr(...args);
+      },
+      availableNetworkDevices(e) {
+        this.isNetworkLibraryAvailable = e;
+      },
+      isLoadingLibraries(isLoading) {
+        this.isLoadingNetworkLibraries = isLoading;
       },
     },
     $trs: {

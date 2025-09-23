@@ -23,6 +23,7 @@
                 :currentSectionIndex="currentSectionIndex"
                 :questionNumber="questionNumber"
                 :questionItem="attemptLogItemValue"
+                :currentQuestionAnswered="currentQuestionAnswered"
                 :wrapperComponentRefs="$refs"
                 @goToQuestion="goToQuestion"
               />
@@ -181,18 +182,16 @@
               >
                 {{ $tr('question', { num: questionNumber + 1, total: exam.question_count }) }}
               </h2>
-              <ContentRenderer
+              <ContentViewer
                 v-if="content && itemId"
-                ref="contentRenderer"
-                :kind="content.kind"
+                ref="contentViewer"
                 :files="content.files"
-                :available="content.available"
                 :extraFields="content.extra_fields"
                 :itemId="itemId"
                 :assessment="true"
                 :allowHints="false"
                 :answerState="currentAttempt.answer"
-                @interaction="saveAnswer"
+                @interaction="interactionHandler"
               />
               <ResourceSyncingUiAlert
                 v-else
@@ -311,13 +310,13 @@
 
 <script>
 
+  import { ref } from 'vue';
   import { mapState } from 'vuex';
   import isEqual from 'lodash/isEqual';
   import {
     displaySectionTitle,
     enhancedQuizManagementStrings,
   } from 'kolibri-common/strings/enhancedQuizManagementStrings';
-  import debounce from 'lodash/debounce';
   import BottomAppBar from 'kolibri/components/BottomAppBar';
   import useKResponsiveWindow from 'kolibri-design-system/lib/composables/useKResponsiveWindow';
   import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
@@ -359,6 +358,7 @@
       const { windowBreakpoint, windowIsMedium, windowIsLarge, windowIsSmall } =
         useKResponsiveWindow();
       const { quizSectionsLabel$, questionsLabel$ } = enhancedQuizManagementStrings;
+      const currentQuestionAnswered = ref(false);
       return {
         questionsLabel$,
         quizSectionsLabel$,
@@ -374,6 +374,7 @@
         windowIsSmall,
         windowIsMedium,
         currentUserId,
+        currentQuestionAnswered,
       };
     },
     data() {
@@ -504,24 +505,19 @@
         return this.currentQuestion.item;
       },
       questionsAnswered() {
-        return Object.keys(
-          this.pastattempts.reduce((map, attempt) => {
-            if (attempt.answer) {
-              map[attempt.item] = true;
-            }
-            return map;
-          }, {}),
-        ).length;
+        const answeredAttemptItems = this.pastattempts.reduce((map, attempt) => {
+          if (attempt.answer) {
+            map[attempt.item] = true;
+          }
+          return map;
+        }, {});
+        if (!answeredAttemptItems[this.attemptLogItemValue] && this.currentQuestionAnswered) {
+          answeredAttemptItems[this.attemptLogItemValue] = true;
+        }
+        return Object.keys(answeredAttemptItems).length;
       },
       questionsUnanswered() {
         return this.exam.question_count - this.questionsAnswered;
-      },
-      debouncedSetAndSaveCurrentExamAttemptLog() {
-        // So as not to share debounced functions between instances of the same component
-        // and also to allow access to the cancel method of the debounced function
-        // best practice seems to be to do it as a computed property and not a method:
-        // https://github.com/vuejs/vue/issues/2870#issuecomment-219096773
-        return debounce(this.setAndSaveCurrentExamAttemptLog, 500);
       },
       layoutDirReset() {
         // Overrides bottomBarLayoutDirection reversal
@@ -553,6 +549,7 @@
       attemptLogItemValue(newVal, oldVal) {
         if (newVal !== oldVal) {
           this.startTime = Date.now();
+          this.currentQuestionAnswered = false;
         }
       },
     },
@@ -642,14 +639,24 @@
           });
       },
       checkAnswer() {
-        if (this.$refs.contentRenderer) {
-          return this.$refs.contentRenderer.checkAnswer();
+        if (this.$refs.contentViewer) {
+          return this.$refs.contentViewer.checkAnswer();
         }
         return null;
       },
+      interactionHandler() {
+        const answer = this.checkAnswer();
+        if (answer) {
+          this.currentQuestionAnswered = true;
+        }
+      },
       saveAnswer(close = false) {
         const answer = this.checkAnswer();
-        if (answer && !isEqual(answer.answerState, this.currentAttempt.answer)) {
+        if (
+          this.currentQuestionAnswered &&
+          answer &&
+          !isEqual(answer.answerState, this.currentAttempt.answer)
+        ) {
           const interaction = {
             answer: answer.answerState,
             simple_answer: answer.simpleAnswer || '',
@@ -660,11 +667,7 @@
               ((this.currentAttempt.time_spent || 0) + Date.now() - this.startTime) / 1000,
           };
           this.startTime = Date.now();
-          if (close) {
-            return this.setAndSaveCurrentExamAttemptLog({ close, interaction });
-          } else {
-            return this.debouncedSetAndSaveCurrentExamAttemptLog({ interaction });
-          }
+          return this.setAndSaveCurrentExamAttemptLog({ close, interaction });
         } else if (close) {
           return this.setAndSaveCurrentExamAttemptLog({ close });
         }
@@ -675,54 +678,30 @@
           return;
         }
         const questionNumber = this.questionNumber - 1;
-        const promise = this.debouncedSetAndSaveCurrentExamAttemptLog.flush() || Promise.resolve();
-        promise.then(() => {
-          this.$router.push({
-            name: ClassesPageNames.EXAM_VIEWER,
-            params: {
-              examId: this.exam.id,
-              questionNumber,
-            },
-          });
-        });
+        this.goToQuestion(questionNumber);
       },
       goToNextQuestion() {
         if (this.questionNumber >= this.questions.length) {
           return;
         }
         const questionNumber = this.questionNumber + 1;
-        const promise = this.debouncedSetAndSaveCurrentExamAttemptLog.flush() || Promise.resolve();
-        promise.then(() => {
-          this.$router.push({
-            name: ClassesPageNames.EXAM_VIEWER,
-            params: {
-              examId: this.exam.id,
-              questionNumber,
-            },
-          });
-        });
+        this.goToQuestion(questionNumber);
       },
       goToQuestion(questionNumber) {
-        const promise = this.debouncedSetAndSaveCurrentExamAttemptLog.flush() || Promise.resolve();
-        promise.then(() => {
-          this.$router.push({
-            name: ClassesPageNames.EXAM_VIEWER,
-            params: {
-              examId: this.exam.id,
-              questionNumber,
-            },
-          });
+        this.saveAnswer();
+        this.$router.push({
+          name: ClassesPageNames.EXAM_VIEWER,
+          params: {
+            examId: this.exam.id,
+            questionNumber,
+          },
         });
       },
       toggleModal() {
         // Flush any existing save event to ensure
-        // that the subit modal contains the latest state
+        // that the submit modal contains the latest state
         if (!this.submitModalOpen) {
-          const promise =
-            this.debouncedSetAndSaveCurrentExamAttemptLog.flush() || Promise.resolve();
-          return promise.then(() => {
-            this.submitModalOpen = !this.submitModalOpen;
-          });
+          this.saveAnswer();
         }
         this.submitModalOpen = !this.submitModalOpen;
       },
@@ -734,7 +713,7 @@
     },
     $trs: {
       submitExam: {
-        message: 'Submit Quiz',
+        message: 'Submit quiz',
         context:
           'Action that learner takes to submit their quiz answers so that the coach can review them.',
       },

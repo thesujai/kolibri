@@ -390,7 +390,7 @@
 
   @import '~kolibri-design-system/lib/styles/definitions';
 
-  .html5-renderer {
+  .html5-viewer {
     position: relative;
     text-align: center;
   }

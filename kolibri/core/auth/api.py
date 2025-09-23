@@ -28,8 +28,10 @@ from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django_filters.rest_framework import BaseInFilter
 from django_filters.rest_framework import CharFilter
 from django_filters.rest_framework import ChoiceFilter
+from django_filters.rest_framework import DateTimeFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters.rest_framework import FilterSet
 from django_filters.rest_framework import ModelChoiceFilter
@@ -48,11 +50,13 @@ from rest_framework import viewsets
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.exceptions import ValidationError as RestValidationError
 from rest_framework.mixins import CreateModelMixin
+from rest_framework.mixins import DestroyModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .constants import collection_kinds
 from .constants import role_kinds
+from .middleware import clear_user_cache_on_delete
 from .models import Classroom
 from .models import Collection
 from .models import Facility
@@ -76,9 +80,12 @@ from kolibri.core.api import ReadOnlyValuesViewset
 from kolibri.core.api import ValuesViewset
 from kolibri.core.api import ValuesViewsetOrderingFilter
 from kolibri.core.auth.constants import user_kinds
+from kolibri.core.auth.constants.demographics import DEFERRED
 from kolibri.core.auth.constants.demographics import NOT_SPECIFIED
 from kolibri.core.auth.permissions.general import _user_is_admin_for_own_facility
 from kolibri.core.auth.permissions.general import DenyAll
+from kolibri.core.auth.tasks import cleanup_expired_deleted_users
+from kolibri.core.auth.utils.delete import delete_imported_user
 from kolibri.core.auth.utils.users import get_remote_users_info
 from kolibri.core.device.permissions import IsSuperuser
 from kolibri.core.device.utils import allow_guest_access
@@ -94,12 +101,26 @@ from kolibri.core.mixins import BulkDeleteMixin
 from kolibri.core.query import annotate_array_aggregate
 from kolibri.core.query import SQCount
 from kolibri.core.serializers import HexOnlyUUIDField
+from kolibri.core.tasks.exceptions import JobRunning
 from kolibri.core.utils.pagination import ValuesViewsetPageNumberPagination
+from kolibri.core.utils.token_generator import TokenGenerator
 from kolibri.core.utils.urls import reverse_path
 from kolibri.plugins.app.utils import interface
 from kolibri.utils.urls import validator
 
 logger = logging.getLogger(__name__)
+
+
+class UUIDInFilter(BaseInFilter, UUIDFilter):
+    pass
+
+
+class ModelChoiceInFilter(BaseInFilter, ModelChoiceFilter):
+    pass
+
+
+class ChoiceInFilter(BaseInFilter, ChoiceFilter):
+    pass
 
 
 class OptionalPageNumberPagination(ValuesViewsetPageNumberPagination):
@@ -296,7 +317,14 @@ class FacilityUserFilter(FilterSet):
     member_of = ModelChoiceFilter(
         method="filter_member_of", queryset=Collection.objects.all()
     )
+    related_to__in = ModelChoiceInFilter(
+        method="filter_related_to__in", queryset=Collection.objects.all()
+    )
     user_type = ChoiceFilter(
+        choices=USER_TYPE_CHOICES,
+        method="filter_user_type",
+    )
+    user_type__in = ChoiceInFilter(
         choices=USER_TYPE_CHOICES,
         method="filter_user_type",
     )
@@ -310,23 +338,72 @@ class FacilityUserFilter(FilterSet):
         choices=USER_TYPE_CHOICES,
         method="filter_exclude_user_type",
     )
+    date_joined__gte = DateTimeFilter(
+        field_name="date_joined",
+        lookup_expr="gte",
+    )
+    date_joined__lte = DateTimeFilter(
+        field_name="date_joined",
+        lookup_expr="lte",
+    )
+    birth_year_gte = CharFilter(method="filter_birth_year_gte")
+    birth_year_lte = CharFilter(method="filter_birth_year_lte")
+
+    by_ids = UUIDInFilter(field_name="id")
 
     def filter_member_of(self, queryset, name, value):
         return queryset.filter(Q(memberships__collection=value) | Q(facility=value))
 
+    def filter_related_to__in(self, queryset, name, value):
+        """
+        Filter users related to any of the collections in the provided value. Related through
+        memberships, facility, or roles.
+        """
+        return queryset.filter(
+            Q(memberships__collection__in=value)
+            | Q(facility__in=value)
+            | Q(roles__collection__in=value)
+        )
+
     def filter_user_type(self, queryset, name, value):
-        if value == "learner":
-            return queryset.filter(roles__isnull=True)
-        if value == "superuser":
-            return queryset.filter(devicepermissions__is_superuser=True)
-        return queryset.filter(roles__kind=value)
+        if isinstance(value, str):
+            value = [value]
+
+        user_type_filter = Q()
+
+        if "learner" in value:
+            user_type_filter |= Q(roles__isnull=True)
+
+        if "coach" in value:
+            # Return users with either coach or classroom assignable coach roles
+            user_type_filter |= Q(roles__kind=role_kinds.COACH) | Q(
+                roles__kind=role_kinds.ASSIGNABLE_COACH
+            )
+        if "superuser" in value:
+            user_type_filter |= Q(devicepermissions__is_superuser=True)
+
+        rest_filters = [
+            user_type_value
+            for user_type_value in value
+            if user_type_value not in ["learner", "coach", "superuser"]
+        ]
+
+        if rest_filters:
+            user_type_filter |= Q(roles__kind__in=rest_filters)
+
+        return queryset.filter(user_type_filter)
 
     def filter_exclude_member_of(self, queryset, name, value):
         return queryset.exclude(Q(memberships__collection=value) | Q(facility=value))
 
     def filter_exclude_coach_for(self, queryset, name, value):
         return queryset.exclude(
-            Q(roles__in=Role.objects.filter(kind=role_kinds.COACH, collection=value))
+            Q(
+                roles__in=Role.objects.filter(
+                    Q(kind=role_kinds.COACH) | Q(kind=role_kinds.ASSIGNABLE_COACH),
+                    collection=value,
+                )
+            )
         )
 
     def filter_exclude_user_type(self, queryset, name, value):
@@ -336,9 +413,39 @@ class FacilityUserFilter(FilterSet):
             return queryset.exclude(devicepermissions__is_superuser=True)
         return queryset.exclude(roles__kind=value)
 
+    def filter_birth_year_gte(self, queryset, name, value):
+        queryset = queryset.exclude(
+            Q(birth_year__isnull=True)
+            | Q(birth_year=NOT_SPECIFIED)
+            | Q(birth_year=DEFERRED)
+        )
+
+        return queryset.filter(Q(birth_year__gte=value))
+
+    def filter_birth_year_lte(self, queryset, name, value):
+        queryset = queryset.exclude(
+            Q(birth_year__isnull=True)
+            | Q(birth_year=NOT_SPECIFIED)
+            | Q(birth_year=DEFERRED)
+        )
+
+        return queryset.filter(Q(birth_year__lte=value))
+
     class Meta:
         model = FacilityUser
-        fields = ["member_of", "user_type", "exclude_member_of", "exclude_user_type"]
+        fields = [
+            "member_of",
+            "related_to__in",
+            "user_type",
+            "user_type__in",
+            "exclude_member_of",
+            "exclude_user_type",
+            "by_ids",
+            "date_joined__gte",
+            "date_joined__lte",
+            "birth_year_gte",
+            "birth_year_lte",
+        ]
 
 
 class PublicFacilityUserViewSet(ReadOnlyValuesViewset):
@@ -395,50 +502,10 @@ class PublicFacilityUserViewSet(ReadOnlyValuesViewset):
         return output
 
 
-class FacilityUserViewSet(ValuesViewset):
-    permission_classes = (KolibriAuthPermissions,)
-    pagination_class = OptionalPageNumberPagination
-    filter_backends = (
-        KolibriAuthPermissionsFilter,
-        DjangoFilterBackend,
-        filters.SearchFilter,
-        ValuesViewsetOrderingFilter,
-    )
-    order_by_field = "username"
-
-    queryset = FacilityUser.objects.all().order_by(order_by_field)
-    serializer_class = FacilityUserSerializer
-    filterset_class = FacilityUserFilter
-    search_fields = ("username", "full_name")
-
-    values = (
-        "id",
-        "username",
-        "full_name",
-        "facility",
-        "roles__kind",
-        "roles__collection",
-        "roles__id",
-        "devicepermissions__is_superuser",
-        "id_number",
-        "gender",
-        "birth_year",
-        "extra_demographics",
-        "date_joined",
-    )
-
-    ordering_fields = (
-        "id",
-        "username",
-        "full_name",
-        "gender",
-        "birth_year",
-        "date_joined",
-    )
-
-    field_map = {
-        "is_superuser": lambda x: bool(x.pop("devicepermissions__is_superuser"))
-    }
+class FacilityUserConsolidateMixin(object):
+    """
+    Mixin for FacilityUser ViewSets to handle consolidate logic
+    """
 
     def consolidate(self, items, queryset):
         output = []
@@ -462,15 +529,150 @@ class FacilityUserViewSet(ValuesViewset):
             if ordering_param.startswith("-"):
                 ordering_param = ordering_param[1:]
                 reverse = True
-
-        output = sorted(output, key=lambda x: x[ordering_param], reverse=reverse)
+        output = sorted(
+            output,
+            key=lambda x: (
+                x[ordering_param].lower()
+                if isinstance(x[ordering_param], str)
+                else x[ordering_param]
+            ),
+            reverse=reverse,
+        )
         return output
+
+
+class FacilityUserViewSet(FacilityUserConsolidateMixin, ValuesViewset, BulkDeleteMixin):
+    permission_classes = (KolibriAuthPermissions,)
+    pagination_class = OptionalPageNumberPagination
+    filter_backends = (
+        KolibriAuthPermissionsFilter,
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        ValuesViewsetOrderingFilter,
+    )
+    order_by_field = "username"
+
+    queryset = FacilityUser.objects.all().order_by(order_by_field)
+    serializer_class = FacilityUserSerializer
+    filterset_class = FacilityUserFilter
+
+    search_fields = ("username", "full_name")
+
+    values = (
+        "id",
+        "username",
+        "full_name",
+        "facility",
+        "roles__kind",
+        "roles__collection",
+        "roles__id",
+        "devicepermissions__is_superuser",
+        "id_number",
+        "gender",
+        "birth_year",
+        "extra_demographics",
+        "date_joined",
+    )
+
+    ordering_fields = (
+        "id",
+        "username",
+        "full_name",
+        "id_number",
+        "gender",
+        "birth_year",
+        "date_joined",
+    )
+
+    field_map = {
+        "is_superuser": lambda x: bool(x.pop("devicepermissions__is_superuser"))
+    }
+
+    def destroy(self, request, *args, **kwargs):
+        if kwargs.get("pk"):
+            # Single object deletion
+            user = self.get_object()
+            user.date_deleted = now()
+            user.save()
+            self._invalidate_removed_users_session([user])
+            try:
+                cleanup_expired_deleted_users.enqueue()
+            except JobRunning:
+                pass  # Task is already running, do nothing
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            # Bulk deletion
+            return self.bulk_destroy(request, *args, **kwargs)
+
+    def _invalidate_removed_users_session(self, users):
+        """
+        Invalidate removed users sessions by clearing their cache.
+        So the next time they make a request, the auth middleware will try to fetch
+        the most up-to-date information for the user, and won't find the user
+        since it was soft deleted.
+        """
+        for user in users:
+            clear_user_cache_on_delete(None, user)
+
+    def perform_bulk_destroy(self, objects):
+        if objects.filter(id=self.request.user.id).exists():
+            raise PermissionDenied("Super user cannot delete self")
+        removed_users = list(objects)
+        objects.update(date_deleted=now())
+        self._invalidate_removed_users_session(removed_users)
 
     def perform_update(self, serializer):
         instance = serializer.save()
         # if the user is updating their own password, ensure they don't get logged out
         if self.request.user == instance:
             update_session_auth_hash(self.request, instance)
+
+
+class DeletedFacilityUserViewSet(
+    FacilityUserConsolidateMixin,
+    ReadOnlyValuesViewset,
+    DestroyModelMixin,
+    BulkDeleteMixin,
+):
+    """Viewset for managing soft-deleted FacilityUsers."""
+
+    permission_classes = (KolibriAuthPermissions,)
+    pagination_class = OptionalPageNumberPagination
+    filter_backends = (
+        KolibriAuthPermissionsFilter,
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        ValuesViewsetOrderingFilter,
+    )
+
+    order_by_field = "date_deleted"
+    queryset = FacilityUser.soft_deleted_objects.all().order_by(order_by_field)
+    serializer_class = FacilityUserSerializer
+    filterset_class = FacilityUserFilter
+
+    search_fields = FacilityUserViewSet.search_fields
+    values = FacilityUserViewSet.values + ("date_deleted",)
+    ordering_fields = FacilityUserViewSet.ordering_fields + ("date_deleted",)
+    field_map = FacilityUserViewSet.field_map
+
+    @decorators.action(detail=False, methods=["post"])
+    def restore(self, request):
+        """
+        Restore soft-deleted FacilityUsers.
+        """
+        # Permissions for allowing bulk restore are the same as for bulk destroy
+        if not self.allow_bulk_destroy():
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        users = self.filter_queryset(self.get_queryset())
+        if not users.exists():
+            raise Http404("No deleted users found to restore.")
+
+        users.update(date_deleted=None)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SanitizeInputsSerializer(serializers.Serializer):
@@ -516,6 +718,33 @@ class UsernameAvailableView(views.APIView):
             return Response(True, status=status.HTTP_200_OK)
 
 
+class UserIdParamSerializer(serializers.Serializer):
+    user_id = HexOnlyUUIDField()
+
+
+class DeleteImportedUserView(views.APIView):
+    permission_classes = [KolibriAuthPermissions]
+
+    def delete(self, request, user_id):
+        """
+        Given a user ID, delete the user from the current facility, and remove
+        certificates and corresponding morango records.
+        """
+        serializer = UserIdParamSerializer(data={"user_id": user_id})
+        serializer.is_valid(raise_exception=True)
+
+        validated_user_id = serializer.validated_data["user_id"]
+        try:
+            user = FacilityUser.objects.get(id=validated_user_id)
+            self.check_object_permissions(request, user)
+
+            delete_imported_user(user)
+
+            return Response({"user_id": user.id})
+        except FacilityUser.DoesNotExist:
+            raise Http404("User does not exist")
+
+
 class FacilityUsernameViewSet(ReadOnlyValuesViewset):
     filter_backends = (DjangoFilterBackend, filters.SearchFilter)
     filterset_fields = ("facility",)
@@ -537,13 +766,17 @@ class FacilityUsernameViewSet(ReadOnlyValuesViewset):
 
 class MembershipFilter(FilterSet):
     user_ids = CharFilter(method="filter_user_ids")
+    by_ids = CharFilter(method="filter_by_ids")
 
     def filter_user_ids(self, queryset, name, value):
         return queryset.filter(user_id__in=value.split(","))
 
+    def filter_by_ids(self, queryset, name, value):
+        return queryset.filter(id__in=value.split(","))
+
     class Meta:
         model = Membership
-        fields = ["user", "collection", "user_ids"]
+        fields = ["user", "collection", "user_ids", "by_ids"]
 
 
 class MembershipViewSet(BulkDeleteMixin, BulkCreateMixin, viewsets.ModelViewSet):
@@ -552,18 +785,21 @@ class MembershipViewSet(BulkDeleteMixin, BulkCreateMixin, viewsets.ModelViewSet)
     queryset = Membership.objects.all()
     serializer_class = MembershipSerializer
     filterset_class = MembershipFilter
-    filterset_fields = ["user", "collection", "user_ids"]
 
 
 class RoleFilter(FilterSet):
     user_ids = CharFilter(method="filter_user_ids")
+    by_ids = CharFilter(method="filter_by_ids")
 
     def filter_user_ids(self, queryset, name, value):
         return queryset.filter(user_id__in=value.split(","))
 
+    def filter_by_ids(self, queryset, name, value):
+        return queryset.filter(id__in=value.split(","))
+
     class Meta:
         model = Role
-        fields = ["user", "collection", "kind", "user_ids"]
+        fields = ["user", "collection", "kind", "user_ids", "by_ids"]
 
 
 class RoleViewSet(BulkDeleteMixin, BulkCreateMixin, viewsets.ModelViewSet):
@@ -755,38 +991,53 @@ class ClassroomViewSet(ValuesViewset):
                 ]
             )
         )
+        soft_deleted_user_ids = list(
+            FacilityUser.soft_deleted_objects.all().values_list("id", flat=True)
+        )
+        active_coach_ids = [
+            coach_id for coach_id in coach_ids if coach_id not in soft_deleted_user_ids
+        ]
         facility_roles = {
             obj.pop("user"): obj
             for obj in Role.objects.filter(
-                user_id__in=coach_ids, collection__kind=collection_kinds.FACILITY
+                user_id__in=active_coach_ids, collection__kind=collection_kinds.FACILITY
             ).values("user", "kind", "collection", "id")
         }
+
         for key, group in groupby(items, lambda x: x["id"]):
             coaches = []
-            for item in group:
-                user_id = item.pop("role__user__id")
-                if (
-                    user_id in facility_roles
-                    and facility_roles[user_id]["collection"] == item["parent"]
-                ):
-                    roles = [facility_roles[user_id]]
-                else:
+            group_list = list(group)
+            base_item = group_list[0]
+
+            for item in group_list:
+                user_id = item.get("role__user__id")
+                if user_id in active_coach_ids:
                     roles = []
-                coach = {
-                    "id": user_id,
-                    "facility": item["parent"],
-                    # Coerce to bool if None
-                    "is_superuser": bool(
-                        item.pop("role__user__devicepermissions__is_superuser")
-                    ),
-                    "full_name": item.pop("role__user__full_name"),
-                    "username": item.pop("role__user__username"),
-                    "roles": roles,
-                }
-                if coach["id"]:
+                    if user_id in facility_roles and facility_roles[user_id][
+                        "collection"
+                    ] == item.get("parent"):
+                        roles.append(facility_roles[user_id])
+
+                    coach = {
+                        "id": user_id,
+                        "facility": item.get("parent"),
+                        "is_superuser": bool(
+                            item.get("role__user__devicepermissions__is_superuser")
+                        ),
+                        "full_name": item.get("role__user__full_name"),
+                        "username": item.get("role__user__username"),
+                        "roles": roles,
+                    }
                     coaches.append(coach)
-            item["coaches"] = coaches
-            output.append(item)
+            consolidated_item = {
+                "id": base_item.get("id"),
+                "name": base_item.get("name"),
+                "parent": base_item.get("parent"),
+                "learner_count": base_item.get("learner_count"),
+                "coaches": coaches,
+            }
+            output.append(consolidated_item)
+
         return output
 
 
@@ -910,23 +1161,157 @@ class SetNonSpecifiedPasswordView(views.APIView):
         return Response()
 
 
-@method_decorator([ensure_csrf_cookie], name="dispatch")
-class SessionViewSet(viewsets.ViewSet):
+class CreateSessionSerializer(serializers.Serializer):
+    username = serializers.CharField(required=False, default=None)
+    user_id = HexOnlyUUIDField(required=False, default=None)
+    password = serializers.CharField(
+        default="",
+        write_only=True,
+        required=False,
+        allow_blank=True,
+    )
+    facility = serializers.PrimaryKeyRelatedField(
+        queryset=Facility.objects.all(),
+        default=Facility.get_default_facility,
+        required=False,
+    )
+    auth_token = serializers.CharField(required=False, default=None)
+
+    def validate(self, attrs):
+        username = attrs.get("username")
+        password = attrs.get("password")
+        facility = attrs.get("facility")
+        user_id = attrs.get("user_id")
+        auth_token = attrs.get("auth_token")
+
+        request = self.context.get("request")
+
+        user = None
+
+        # OS User authentication
+        if interface.enabled and valid_app_key_on_request(request):
+            # If we are in app context, then try to get the automatically created OS User
+            # if it matches the username, without needing a password.
+            user = self._check_os_user(request, username)
+
+        # user_id/auth_token authentication
+        if user is None and user_id and auth_token:
+            if TokenGenerator().check_token(user_id, auth_token):
+                user = FacilityUser.objects.filter(
+                    id=user_id, facility=facility
+                ).first()
+
+        # username/password authentication
+        if user is None:
+            # Otherwise attempt full authentication
+            user = authenticate(username=username, password=password, facility=facility)
+
+        if user is not None and user.is_active:
+            attrs["user"] = user
+            return attrs
+
+        # Otherwise, throw a meaningful validation error
+        self._throw_validation_error(username, password, facility)
+
     def _check_os_user(self, request, username):
-        auth_token = request.COOKIES.get(APP_AUTH_TOKEN_COOKIE_NAME)
-        if auth_token:
+        app_auth_token = request.COOKIES.get(APP_AUTH_TOKEN_COOKIE_NAME)
+        if app_auth_token:
             try:
-                user = FacilityUser.objects.get_or_create_os_user(auth_token)
+                user = FacilityUser.objects.get_or_create_os_user(app_auth_token)
                 if user is not None and user.username == username:
                     return user
             except ValidationError as e:
                 logger.error(e)
 
-    def create(self, request):
-        username = request.data.get("username", "")
-        password = request.data.get("password", "")
-        facility_id = request.data.get("facility", None)
+    def _throw_validation_error(self, username, password, facility):
+        """
+        Throw a RestValidationError with a helpful error message
+        depending on what went wrong with authentication.
+        """
+        # Find the FacilityUser we're looking for
+        try:
+            unauthenticated_user = FacilityUser.objects.get(
+                username__iexact=username, facility=facility
+            )
+        except (ValueError, ObjectDoesNotExist):
+            raise RestValidationError(
+                detail={
+                    "username": [
+                        {
+                            "id": error_constants.NOT_FOUND,
+                            "metadata": {
+                                "field": "username",
+                                "message": "Username not found.",
+                            },
+                        }
+                    ]
+                }
+            )
+        except FacilityUser.MultipleObjectsReturned:
+            # Handle case of multiple matching usernames
+            unauthenticated_user = FacilityUser.objects.filter(
+                username__exact=username, facility=facility
+            ).first()
 
+        if unauthenticated_user.password == NOT_SPECIFIED and not hasattr(
+            unauthenticated_user, "os_user"
+        ):
+            # Here - we have a Learner whose password is "NOT_SPECIFIED" because they were created
+            # while the "Require learners to log in with password" setting was disabled - but now
+            # it is enabled again.
+            # Alternatively, they may have been created as an OSUser for automatic login with an
+            # authentication token. If this is the case, then we do not allow for the password to be set.
+            raise RestValidationError(
+                detail={
+                    "password": [
+                        {
+                            "id": error_constants.PASSWORD_NOT_SPECIFIED,
+                            "metadata": {
+                                "field": "password",
+                                "message": "Username is valid, but password needs to be set before login.",
+                            },
+                        }
+                    ]
+                }
+            )
+
+        if (
+            not password
+            and FacilityUser.objects.filter(
+                username__iexact=username, facility=facility
+            ).exists()
+        ):
+            # Password was missing, but username is valid, prompt to give password
+            raise RestValidationError(
+                detail={
+                    "password": [
+                        {
+                            "id": error_constants.MISSING_PASSWORD,
+                            "metadata": {
+                                "field": "password",
+                                "message": "Username is valid, but password is missing.",
+                            },
+                        }
+                    ]
+                }
+            )
+
+        # If no other error message was raised, then throw a generic invalid credentials message
+        raise RestValidationError(
+            detail={
+                "non_field_errors": [
+                    {
+                        "id": error_constants.INVALID_CREDENTIALS,
+                        "metadata": {},
+                    }
+                ]
+            }
+        )
+
+
+@method_decorator([ensure_csrf_cookie], name="dispatch")
+class SessionViewSet(viewsets.ViewSet):
+    def create(self, request):
         # Only enforce this when running in an app
         if (
             interface.enabled
@@ -938,89 +1323,30 @@ class SessionViewSet(viewsets.ViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        user = None
-        if interface.enabled and valid_app_key_on_request(request):
-            # If we are in app context, then try to get the automatically created OS User
-            # if it matches the username, without needing a password.
-            user = self._check_os_user(request, username)
-        if user is None:
-            # Otherwise attempt full authentication
-            user = authenticate(
-                username=username, password=password, facility=facility_id
-            )
-        if user is not None and user.is_active:
-            # Correct password, and the user is marked "active"
-            login(request, user)
-            # Success!
-            return self.get_session_response(request)
-        # Otherwise, try to give a helpful error message
-        # Find the FacilityUser we're looking for
-        try:
-            unauthenticated_user = FacilityUser.objects.get(
-                username__iexact=username, facility=facility_id
-            )
-        except (ValueError, ObjectDoesNotExist):
-            return Response(
-                [
-                    {
-                        "id": error_constants.NOT_FOUND,
-                        "metadata": {
-                            "field": "username",
-                            "message": "Username not found.",
-                        },
-                    }
-                ],
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        except FacilityUser.MultipleObjectsReturned:
-            # Handle case of multiple matching usernames
-            unauthenticated_user = FacilityUser.objects.filter(
-                username__exact=username, facility=facility_id
-            ).first()
-        if unauthenticated_user.password == NOT_SPECIFIED and not hasattr(
-            unauthenticated_user, "os_user"
-        ):
-            # Here - we have a Learner whose password is "NOT_SPECIFIED" because they were created
-            # while the "Require learners to log in with password" setting was disabled - but now
-            # it is enabled again.
-            # Alternatively, they may have been created as an OSUser for automatic login with an
-            # authentication token. If this is the case, then we do not allow for the password to be set.
-            return Response(
-                [
-                    {
-                        "id": error_constants.PASSWORD_NOT_SPECIFIED,
-                        "metadata": {
-                            "field": "password",
-                            "message": "Username is valid, but password needs to be set before login.",
-                        },
-                    }
-                ],
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if (
-            not password
-            and FacilityUser.objects.filter(
-                username__iexact=username, facility=facility_id
-            ).exists()
-        ):
-            # Password was missing, but username is valid, prompt to give password
-            return Response(
-                [
-                    {
-                        "id": error_constants.MISSING_PASSWORD,
-                        "metadata": {
-                            "field": "password",
-                            "message": "Username is valid, but password is missing.",
-                        },
-                    }
-                ],
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # Respond with error
-        return Response(
-            [{"id": error_constants.INVALID_CREDENTIALS, "metadata": {}}],
-            status=status.HTTP_401_UNAUTHORIZED,
+        serializer = CreateSessionSerializer(
+            data=request.data, context={"request": request}
         )
+        if serializer.is_valid():
+            user = serializer.validated_data["user"]
+            login(request, user)
+            return self.get_session_response(request)
+
+        errors = serializer.errors
+        return self._get_error_response(errors)
+
+    def _get_error_response(self, errors):
+        """
+        Helper method to construct a standardized error response.
+        """
+        error_list = []
+        response_status = status.HTTP_400_BAD_REQUEST
+        for field, field_errors in errors.items():
+            for error in field_errors:
+                error_list.append(error)
+                if error.get("id") == error_constants.INVALID_CREDENTIALS:
+                    response_status = status.HTTP_401_UNAUTHORIZED
+
+        return Response(error_list, status=response_status)
 
     def destroy(self, request, pk=None):
         logout(request)

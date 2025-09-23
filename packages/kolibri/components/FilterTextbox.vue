@@ -16,11 +16,12 @@
       :class="['k-filter-input', $computedClass(kFilterPlaceHolderStyle)]"
       :style="{
         color: $themeTokens.text,
-        border: `2px solid ${$themeTokens.fineLine}`,
+        border: showBorder ? `2px solid ${$themeTokens.fineLine}` : 'none',
       }"
       :placeholder="placeholder"
       :aria-label="placeholder"
       :autofocus="autofocus"
+      :aria-controls="ariaControls"
       @keyup="throttledEmitInput($event.target.value)"
     >
 
@@ -79,6 +80,21 @@
         required: false,
         default: 15,
       },
+      /**
+       * Whether to show a border around the input
+       */
+      showBorder: {
+        type: Boolean,
+        default: true,
+      },
+      /**
+       * The aria-controls attribute for the input
+       * This is used to link the input to the element it controls
+       */
+      ariaControls: {
+        type: String,
+        default: null,
+      },
     },
     computed: {
       throttledEmitInput() {
@@ -117,6 +133,12 @@
     methods: {
       handleClickClear() {
         this.model = '';
+        this.$refs.searchinput.focus();
+      },
+      /**
+       * @public
+       */
+      focus() {
         this.$refs.searchinput.focus();
       },
     },

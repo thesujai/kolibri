@@ -95,7 +95,7 @@
     computed: {
       importedFacility() {
         const [facility] = this.facilities;
-        if (facility && window.sessionStorage.getItem(facilityImported) === 'true') {
+        if (facility && window.localStorage.getItem(facilityImported) === 'true') {
           return facility;
         }
         return null;

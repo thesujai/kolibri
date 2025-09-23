@@ -161,14 +161,17 @@ export class HeartBeat {
    * @return {Promise} promise that resolves when the endpoint check is complete.
    */
   _checkSession() {
-    const { id, currentUserId } = useUser();
+    const { sessionId, currentUserId, setSession } = useUser();
+
     // Record the current user id to check if a different one is returned by the server.
     if (!get(this._connection.connected)) {
       // If not currently connected to the server, flag that we are currently trying to reconnect.
       createTryingToReconnectSnackbar();
     }
+
     // Log the time at the start of the request for time diff setting.
     const pollStart = Date.now();
+
     return this._client
       .request({
         data: {
@@ -185,8 +188,9 @@ export class HeartBeat {
         // Log the time that the poll of the session endpoint ended.
         const pollEnd = Date.now();
         const session = response.data;
+
         // If our session is already defined, check the user id in the response
-        if (get(id) && session.user_id !== get(currentUserId)) {
+        if (get(sessionId) && session.user_id !== get(currentUserId)) {
           if (session.user_id === null) {
             // If it is different, and the user_id is now null then our user has been signed out.
             return this.signOutDueToInactivity();
@@ -196,7 +200,8 @@ export class HeartBeat {
             redirectBrowser();
           }
         }
-        store.dispatch('setSession', {
+
+        setSession({
           session,
           // Calculate an approximation of the client 'now' that was simultaneous to the server
           // 'now' that was sent back with the request. We calculate this as the mean of the
@@ -211,7 +216,6 @@ export class HeartBeat {
         });
       })
       .catch(error => {
-        // An error occurred.
         logging.error('Session polling failed, with error: ', error);
         if (DisconnectionErrorCodes.includes(error.response.status)) {
           // We had an error that indicates that we are disconnected, so start to monitor
@@ -220,6 +224,7 @@ export class HeartBeat {
         }
       });
   }
+
   /*
    * Method to begin monitoring the disconnected state from the server.
    * This method can be called repeatedly as it will only initiate anything

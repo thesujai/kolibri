@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`TaskPanel renders correctly when it is a canceled DISKCONTENTEXPORT task 1`] = `
 <div class="task-panel task-panel-sm">

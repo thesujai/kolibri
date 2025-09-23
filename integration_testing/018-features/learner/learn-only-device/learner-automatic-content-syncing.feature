@@ -1,19 +1,20 @@
 Feature: Learners automatic syncing
 
   Background:
-    Given I am signed in as learner on a learn-only device (LOD)
+    Given I am signed in as a learner on a learn-only device (LOD)
     	And there is a Kolibri server in the network
-  				And a coach has enrolled the learner to a class and assigned lesson and a quiz resources to the learner
+  				And a coach has enrolled the learner to a class and assigned lesson and quiz resources to the learner
 
 	Scenario: LOD - Assigned lesson and quiz resources are automatically transferred to the learn-only device
   	Given I am signed in as learner on a learn-only device
-  				And there is a Kolibri server in the network
-  				And a coach has enrolled the learner to a class and assigned lesson and a quiz resources to the learner
+  		And there is a Kolibri server in the network
+  		And a coach has enrolled the learner to a class and assigned lesson and quiz resources to the learner
   	When I go to the *Home* page
   		And I click on the class name
   	Then I see all the lesson and quiz resources already downloaded on my device
   	When I complete a resource
-  	Then a coach is able to see the lesson and quiz completion progress at *Coach > Class home* and *Coach > Reports*
+  	Then after a reasonable period of time the data is synced to the server
+  		And a coach is able to see the lesson and quiz completion progress at *Coach > Class home* and *Coach > Lessons*, *Coach > Quizzes* and *Coach > Learners*
   	When a coach assigns a new lesson or a quiz
   	Then after a reasonable period of time the resources get automatically transferred to the learn-only device
   		And I am able to interact with and complete the resources
@@ -50,28 +51,27 @@ Feature: Learners automatic syncing
 			And I see a *Go to my downloads* button
 			And I see a *Close* button
 
-	Scenario: LOD - Learner allows metered data on first time use #Will be enabled in Kolibri 0.17
-		Given I have set my device to allow download on metered connection
-			And I am about to do something that would use the metered connection for the first time in Kolibri
-		Then I see the *Use metered data?* modal
-			And I see *You are using a metered connection. If you are on a limited data plan, you may have to pay extra charges.*
-			And I see the option *No do not use metered data* selected by default
-			And I see the other option *Yes, use metered data*
+	Scenario: LOD - Learner allows mobile data on first time use
+		Given I have set my device to allow download on mobile connection
+			And I am about to do something that would use the mobile connection for the first time in Kolibri
+		Then I see the *Use mobile data?* modal
+			And I see *You may have a limited amount of data on your mobile plan. Allowing Kolibri to download resources via mobile data may use up your entire plan and/or incur extra charges.*
+			And I see the option *Do do not allow Kolibri to use mobile data* selected by default
+			And I see the other option *Allow Kolibri to use mobile data*
 			And I see a *Continue* button
-		When I select the *Yes, use metered data* option
+		When I select the *Allow Kolibri to use mobile data* option
 			And I click *Continue*
-		Then I see that I am able to use the metered data
+		Then I see that I am able to use the mobile data
 
-	Scenario: LOD - Learner disallows metered data on first time use #Will be enabled in Kolibri 0.17
-		Given I have set my device to allow download on metered connection
-			And I am about to do something that would use the metered connection for the first time in Kolibri
-		Then I see the *Use metered data?* modal
-			And I see *You are using a metered connection. If you are on a limited data plan, you may have to pay extra charges.*
-			And I see the option *No do not use metered data* selected by default
-			And I see the other option *Yes, use metered data*
+	Scenario: LOD - Learner disallows mobile data on first time use
+		Given I have set my device to allow download on mobile connection
+			And I am about to do something that would use the mobile connection for the first time in Kolibri
+		And I see *You may have a limited amount of data on your mobile plan. Allowing Kolibri to download resources via mobile data may use up your entire plan and/or incur extra charges.*
+			And I see the option *Do do not allow Kolibri to use mobile data* selected by default
+			And I see the other option *Allow Kolibri to use mobile data*
 			And I see a *Continue* button
 		When I click *Continue*
-		Then I see that I am not able to use the metered data #the *Other libraries* section would appear empty
+		Then I see that I am not able to use the mobile data #the *Other libraries* section would appear empty
 
 	Scenario: LOD - Learner can see automatic syncing updates while not using the Android app
 		Given I've closed Kolibri
@@ -93,3 +93,24 @@ Feature: Learners automatic syncing
 			And the automatic syncing has failed
 		When I check my device notifications
 				Then I see the following notification: *Library update failed*
+
+	Scenario: Learners can see device syncing statuses
+		When the learner device is attempting to sync to the classroom server
+			And I open the user menu in the top appbar
+		Then I see a *device status* indicator showing the device is syncing
+		When the learner device has successfully synced
+			And I open the user menu in the top appbar
+		Then I see a *device status* indicator showing the device has synced a number of minutes ago
+
+	Scenario: Learners can see errors associated with device syncing
+		When the learner device is unable to sync with the classroom server
+			And I open the user menu in the top appbar
+		Then I see a *device status* red error indicator showing the device is not recently synced
+		When the learner device has successfully synced in the past but is unable to currently sync
+			And I open the user menu in the top appbar
+		Then I see a *device status* red error indicator showing the device has synced a number of minutes ago
+
+	Scenario: Learners can see that the device is not connected to the classroom server
+		When the learner device is not connected to the classroom server
+			And I open the user menu in the top appbar
+		Then I see a *device status* indicator showing the device is not connected

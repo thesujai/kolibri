@@ -18,7 +18,7 @@ Feature: Learner engages with an assigned quiz
     Then I see the quiz modal
       And I see all of my previously given answers
     When I answer the remaining questions
-      And I clock the *Submit quiz* button
+      And I click the *Submit quiz* button
     Then I am back at the *Learn > Home > Classes > '<class>'* page
       And I see a yellow star icon at the lower left corner of the quiz card
       And I see the score of the quiz in percents

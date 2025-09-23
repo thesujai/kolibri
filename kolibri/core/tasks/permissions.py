@@ -187,3 +187,13 @@ class NotProvisioned(BasePermission):
         from kolibri.core.device.utils import device_provisioned
 
         return not device_provisioned()
+
+
+class FirstProvisioning(BasePermission):
+    def user_can_run_job(self, user, job):
+        from kolibri.core.device.utils import device_provisioned
+
+        return not device_provisioned()
+
+    def user_can_read_job(self, user, job):
+        return True

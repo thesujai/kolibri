@@ -1,10 +1,10 @@
 import store from 'kolibri/store';
-import ContentRendererModule from 'kolibri-viewer';
+import ContentViewerModule from 'kolibri-viewer';
 import MediaPlayerComponent from './views/MediaPlayerIndex';
 import storeModule from './modules';
 
-class MediaPlayerModule extends ContentRendererModule {
-  get rendererComponent() {
+class MediaPlayerModule extends ContentViewerModule {
+  get viewerComponent() {
     return MediaPlayerComponent;
   }
 

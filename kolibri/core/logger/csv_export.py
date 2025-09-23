@@ -7,27 +7,34 @@ from collections import OrderedDict
 
 from dateutil import parser
 from django.core.cache import cache
+from django.db.models import Case
+from django.db.models import CharField
 from django.db.models import F
 from django.db.models import Max
 from django.db.models import OuterRef
 from django.db.models import Subquery
+from django.db.models import Value
+from django.db.models import When
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from le_utils.constants import content_kinds
 
 from .models import ContentSessionLog
 from .models import ContentSummaryLog
+from kolibri.core.auth.constants import user_kinds
+from kolibri.core.auth.models import Role
 from kolibri.core.content.models import ChannelMetadata
 from kolibri.core.content.models import ContentNode
 from kolibri.core.utils.csv import open_csv_for_writing
 from kolibri.core.utils.csv import output_mapper
+from kolibri.core.utils.csv import validate_open_csv_params
 
 
 logger = logging.getLogger(__name__)
 
 CSV_EXPORT_FILENAMES = {
-    "session": "{}_{}_content_session_logs_from_{}_to_{}.csv",
-    "summary": "{}_{}_content_summary_logs_from_{}_to_{}.csv",
+    "session": "log_export/{}_{}_content_session_logs_from_{}_to_{}.csv",
+    "summary": "log_export/{}_{}_content_summary_logs_from_{}_to_{}.csv",
 }
 
 CACHE_TIMEOUT = 60 * 10
@@ -114,12 +121,19 @@ mappings = {
     "content_title": get_cached_content_title,
     "time_spent": lambda x: "{:.1f}".format(round(x["time_spent"], 1)),
     "progress": lambda x: "{:.4f}".format(math.floor(x["progress"] * 10000.0) / 10000),
+    "user_type": lambda x: user_kinds.labels.get(
+        x.get("user_type"), x.get("user_type")
+    ),
 }
 
 labels = OrderedDict(
     (
         ("user__facility__name", _("Facility name")),
         ("user__username", _("Username")),
+        (
+            "user_type",
+            pgettext_lazy("CSV column header for the type of user", "User type"),
+        ),
         ("channel_id", _("Channel id")),
         ("channel_name", _("Channel name")),
         ("content_id", _("Content id")),
@@ -175,7 +189,7 @@ def add_ancestors_info(row, ancestors, max_depth):
     ancestors = ancestors[1:]
     row.update(
         {
-            f"Topic level {level + 1}": ancestors[level]["title"]
+            f"Folder level {level + 1}": ancestors[level]["title"]
             if level < len(ancestors)
             else ""
             for level in range(max_depth)
@@ -190,10 +204,32 @@ def map_object(item, topic_headers_length):
     return mapped_item
 
 
+user_type_annotations = {
+    "user_facility_role_kind": Subquery(
+        Role.objects.filter(
+            user=OuterRef("user"),
+            collection=OuterRef("user__facility"),
+        ).values("kind")[:1]
+    ),
+    "user_type": Case(
+        When(
+            user__devicepermissions__is_superuser=True, then=Value(user_kinds.SUPERUSER)
+        ),
+        When(user__roles__isnull=True, then=Value(user_kinds.LEARNER)),
+        When(user_facility_role_kind__isnull=False, then=F("user_facility_role_kind")),
+        When(
+            user__roles__kind=user_kinds.COACH, then=Value(user_kinds.ASSIGNABLE_COACH)
+        ),
+        default=Value(user_kinds.LEARNER),
+        output_field=CharField(),
+    ),
+}
+
 classes_info = {
     "session": {
         "queryset": ContentSessionLog.objects.exclude(kind=content_kinds.QUIZ).annotate(
-            most_recent_session_log_extra_fields=F("extra_fields")
+            most_recent_session_log_extra_fields=F("extra_fields"),
+            **user_type_annotations,
         ),
         "filename": CSV_EXPORT_FILENAMES["session"],
         "db_columns": (
@@ -207,6 +243,7 @@ classes_info = {
             "progress",
             "kind",
             "most_recent_session_log_extra_fields",
+            "user_type",
         ),
     },
     "summary": {
@@ -219,7 +256,8 @@ classes_info = {
                 )
                 .order_by("-end_timestamp")
                 .values("extra_fields")[:1]
-            )
+            ),
+            **user_type_annotations,
         ),
         "filename": CSV_EXPORT_FILENAMES["summary"],
         "db_columns": (
@@ -234,14 +272,25 @@ classes_info = {
             "progress",
             "kind",
             "most_recent_session_log_extra_fields",
+            "user_type",
         ),
     },
 }
 
 
 def csv_file_generator(
-    facility, log_type, filepath, start_date, end_date, overwrite=False
+    facility,
+    log_type,
+    start_date,
+    end_date,
+    overwrite=False,
+    storage_filepath=None,
+    local_filepath=None,
 ):
+    validate_open_csv_params(storage_filepath, local_filepath)
+
+    if local_filepath and not overwrite and os.path.exists(local_filepath):
+        raise ValueError("{} already exists".format(local_filepath))
 
     if log_type not in ("summary", "session"):
         raise ValueError(
@@ -256,8 +305,6 @@ def csv_file_generator(
         else parser.parse(end_date) + datetime.timedelta(days=1)
     )
 
-    if not overwrite and os.path.exists(filepath):
-        raise ValueError("{} already exists".format(filepath))
     queryset = log_info["queryset"].filter(
         dataset_id=facility.dataset_id,
     )
@@ -276,7 +323,7 @@ def csv_file_generator(
     )
     # len of topic headers should be equal to the max depth of the content node
     topic_headers = [
-        (f"Topic level {i+1}", _(f"Topic level {i+1}"))
+        (f"Folder level {i+1}", _(f"Folder level {i+1}"))
         for i in range(get_max_ancestor_depth(queryset))
     ]
 
@@ -285,14 +332,16 @@ def csv_file_generator(
         label for _, label in topic_headers
     ]
 
-    csv_file = open_csv_for_writing(filepath)
-
-    with csv_file as f:
+    with open_csv_for_writing(
+        storage_filepath=storage_filepath,
+        local_filepath=local_filepath,
+    ) as f:
         writer = csv.DictWriter(f, header_labels)
-        logger.info("Creating csv file {filename}".format(filename=filepath))
         writer.writeheader()
-        for item in queryset.select_related("user", "user__facility").values(
-            *log_info["db_columns"]
+        for item in (
+            queryset.select_related("user", "user__facility")
+            .prefetch_related("user__roles")
+            .values(*log_info["db_columns"])
         ):
             writer.writerow(map_object(item, len(topic_headers)))
             yield

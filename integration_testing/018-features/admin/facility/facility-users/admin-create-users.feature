@@ -13,8 +13,8 @@ Feature: Admin creates users
       And I enter the password
       And I re-enter the password
       And I select *Learner* for the *User type*
-      And I enter *Identifier* if desired
-      And I select *Gender* and *Birth year* if desired
+      And I enter *Identifier* #optional
+      And I select *Gender* and *Birth year* #optional
       And I click the *Save* button
     Then the page reloads
       And I see the *User created* snackbar message
@@ -30,8 +30,8 @@ Feature: Admin creates users
       And I select *Coach* for the *User type*
     Then I see the coach type options
     	And I see the *Class coach* option selected by default
-    When I enter *Identifier* if desired
-      And I select *Gender* and *Birth year* if desired
+    When I enter *Identifier* #optional
+      And I select *Gender* and *Birth year* #optional
       And I click the *Save* button
     Then the page reloads
       And I see the *User created* snackbar message
@@ -48,8 +48,8 @@ Feature: Admin creates users
       And I select *Coach* for the *User type*
     Then I see the coach type options
     When I select the *Facility coach* option
-      And I enter *Identifier* if desired
-      And I select *Gender* and *Birth year* if desired
+      And I enter *Identifier* #optional
+      And I select *Gender* and *Birth year* #optional
       And I click the *Save* button
     Then the page reloads
       And I see the *User created* snackbar message
@@ -64,8 +64,8 @@ Feature: Admin creates users
       And I enter the password
       And I re-enter the password
       And I select *Admin* for the *User type*
-      And I enter *Identifier* if desired
-      And I select *Gender* and *Birth year* if desired
+      And I enter *Identifier* #optional
+      And I select *Gender* and *Birth year* #optional
       And I click the *Save* button
     Then the page reloads
       And I see the *User created* snackbar message

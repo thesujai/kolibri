@@ -72,9 +72,9 @@
     },
     mixins: [commonCoreStrings],
     setup() {
-      const { full_name, user_id } = useUser();
+      const { full_name, currentUserId } = useUser();
       const { activeClassesQuizzes } = useLearnerResources();
-      return { userName: full_name, userId: user_id, activeClassesQuizzes };
+      return { userName: full_name, userId: currentUserId, activeClassesQuizzes };
     },
     computed: {
       ...mapState('examReportViewer', [
@@ -147,7 +147,7 @@
         context: 'Message displayed when a quiz report is not yet available.',
       },
       quizReportComingSoonDetails: {
-        message: 'You can see your quiz report when your coach shares it',
+        message: 'You can see your quiz report when your coach ends the quiz',
         context: 'Details message displayed when a quiz report is not yet available.',
       },
     },

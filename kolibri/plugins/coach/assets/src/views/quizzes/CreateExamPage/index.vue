@@ -68,7 +68,6 @@
           </KRadioButtonGroup>
         </KGrid>
       </div>
-
       <CreateQuizSection v-if="quizInitialized && quiz.draft" />
 
       <BottomAppBar>
@@ -105,7 +104,7 @@
       {{ closeConfirmationMessage$() }}
     </KModal>
 
-    <router-view />
+    <router-view v-if="quizInitialized" />
   </CoachImmersivePage>
 
 </template>
@@ -116,10 +115,10 @@
   import get from 'lodash/get';
   import { ERROR_CONSTANTS } from 'kolibri/constants';
   import CatchErrors from 'kolibri/utils/CatchErrors';
-  import { ref } from 'vue';
+  import { ref, getCurrentInstance } from 'vue';
   import pickBy from 'lodash/pickBy';
   import BottomAppBar from 'kolibri/components/BottomAppBar';
-  import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
+  import commonCoreStrings, { coreStrings } from 'kolibri/uiText/commonCoreStrings';
   import { enhancedQuizManagementStrings } from 'kolibri-common/strings/enhancedQuizManagementStrings';
   import useSnackbar from 'kolibri/composables/useSnackbar';
   import { PageNames } from '../../../constants';
@@ -140,9 +139,11 @@
     },
     mixins: [commonCoreStrings],
     setup() {
+      const store = getCurrentInstance().proxy.$store;
       const closeConfirmationToRoute = ref(null);
       const { createSnackbar } = useSnackbar();
-      const { classId, groups } = useCoreCoach();
+      const { classId, initClassInfo, groups } = useCoreCoach();
+
       const {
         quizHasChanged,
         quiz,
@@ -155,8 +156,9 @@
       const showError = ref(false);
       const quizInitialized = ref(false);
 
+      initClassInfo().then(() => store.dispatch('notLoading'));
+
       const {
-        saveAndClose$,
         allSectionsEmptyWarning$,
         changesSavedSuccessfully$,
         sectionOrderLabel$,
@@ -167,6 +169,7 @@
       } = enhancedQuizManagementStrings;
 
       const { closeConfirmationTitle$, closeConfirmationMessage$ } = coachStrings;
+      const { saveAndClose$ } = coreStrings;
 
       return {
         closeConfirmationTitle$,
@@ -241,21 +244,6 @@
         });
       },
     },
-    beforeRouteEnter(to, from, next) {
-      // If we're coming from no quizId and going to replace questions, redirect to exam creation
-      // then we're coming from another page altogether OR we're coming back from a refresh
-      if (!from.params?.quizId && to.name === PageNames.QUIZ_REPLACE_QUESTIONS) {
-        next({
-          name: PageNames.EXAM_CREATION_ROOT,
-          params: {
-            classId: to.params.classId,
-            quizId: to.params.quizId,
-          },
-        });
-      } else {
-        next();
-      }
-    },
     beforeRouteUpdate(to, from, next) {
       if (
         to.name === PageNames.QUIZ_SELECT_PRACTICE_QUIZ &&
@@ -312,7 +300,7 @@
       }
       this.quizInitialized = true;
     },
-    destroy() {
+    destroyed() {
       window.removeEventListener('beforeunload', this.beforeUnload);
     },
     methods: {

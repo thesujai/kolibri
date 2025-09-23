@@ -82,10 +82,10 @@ export default function useProgressTracking(store) {
   const extra_fields_dirty_bit = ref(null);
   const mastery_criterion = ref(null);
   const totalattempts = ref(null);
-  const pastattempts = reactive([]);
+  const pastattempts = ref([]);
   const pastattemptMap = reactive({});
   // Array of as yet unsaved interactions
-  const unsaved_interactions = reactive([]);
+  const unsaved_interactions = ref([]);
   const context = ref(null);
 
   let lastElapsedTimeCheck;
@@ -162,21 +162,20 @@ export default function useProgressTracking(store) {
       clearObject(extra_fields);
       Object.assign(extra_fields, data.extra_fields || {});
       set(mastery_criterion, valOrNull(data.mastery_criterion));
-      pastattempts.splice(0);
-      pastattempts.push(...(data.pastattempts || []));
+      set(pastattempts, [...(data.pastattempts || [])]);
       clearObject(pastattemptMap);
       Object.assign(
         pastattemptMap,
         data.pastattempts ? fromPairs(data.pastattempts.map(a => [a.id, a])) : {},
       );
       set(totalattempts, valOrNull(data.totalattempts));
-      unsaved_interactions.splice(0);
+      set(unsaved_interactions, []);
     });
   }
 
   /**
    * Initialize a content session for progress tracking
-   * To be called on page load for content renderers
+   * To be called on page load for content viewers
    */
   function initContentSession({ node, lessonId, quizId, repeat = false } = {}) {
     const data = {};
@@ -312,7 +311,7 @@ export default function useProgressTracking(store) {
     set(time_spent_delta, 0);
     set(extra_fields_dirty_bit, false);
     // Do this to reactively clear the array
-    unsaved_interactions.splice(0);
+    set(unsaved_interactions, []);
     forceSessionUpdate = false;
   }
 
@@ -325,7 +324,7 @@ export default function useProgressTracking(store) {
     const timeSpentDelta = get(time_spent_delta);
     const extraFieldsChanged = get(extra_fields_dirty_bit);
     const progress = get(progress_state);
-    const unsavedInteractions = JSON.parse(JSON.stringify(unsaved_interactions));
+    const unsavedInteractions = JSON.parse(JSON.stringify(get(unsaved_interactions)));
     const extraFields = JSON.parse(JSON.stringify(extra_fields));
 
     if (
@@ -450,7 +449,7 @@ export default function useProgressTracking(store) {
       if (!isPlainObject(interaction)) {
         throw TypeError('interaction must be an object');
       }
-      unsaved_interactions.push(interaction);
+      set(unsaved_interactions, [...get(unsaved_interactions), interaction]);
       if (!interaction.id) {
         const unsavedInteraction = get(pastattempts).find(
           a => !a.id && a.item === interaction.item,
@@ -460,7 +459,7 @@ export default function useProgressTracking(store) {
             set(unsavedInteraction, key, interaction[key]);
           }
         } else {
-          pastattempts.unshift(interaction);
+          set(pastattempts, [interaction, ...get(pastattempts)]);
           set(totalattempts, get(totalattempts) + 1);
         }
       }

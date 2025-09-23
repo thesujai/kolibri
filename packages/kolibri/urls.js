@@ -65,19 +65,16 @@ class UrlResolver {
 
     const patterns = this._patterns[name];
     if (!patterns) {
-      urlFunc = () => {
-        if (process.env.NODE_ENV !== 'production') {
-          if (name.includes('-')) {
-            throw new Error(
-              `URL pattern names should use underscores instead of dashes. Try "${name.replace('-', '_')}"`,
-            );
-          }
+      if (process.env.NODE_ENV !== 'production') {
+        if (name.includes('-')) {
+          throw new Error(
+            `URL pattern names should use underscores instead of dashes. Try "${name.replace('-', '_')}"`,
+          );
         }
-        throw new Error(`URL pattern "${name}" not found`);
-      };
-    } else {
-      urlFunc = this._createUrlFunction(name, patterns);
+      }
+      return;
     }
+    urlFunc = this._createUrlFunction(name, patterns);
 
     // Cache the function
     this._functionCache.set(name, urlFunc);

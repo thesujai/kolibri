@@ -1,8 +1,8 @@
-import ContentRendererModule from 'kolibri-viewer';
+import ContentViewerModule from 'kolibri-viewer';
 import EPUBComponent from './views/EpubRendererIndex';
 
-class DocumentEPUBModule extends ContentRendererModule {
-  get rendererComponent() {
+class DocumentEPUBModule extends ContentViewerModule {
+  get viewerComponent() {
     EPUBComponent.contentModule = this;
     return EPUBComponent;
   }

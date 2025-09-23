@@ -8,7 +8,6 @@ import FacilityAppBarPage from '../../src/views/FacilityAppBarPage';
 function makeWrapper({ propsData = {}, getters = {} }) {
   const store = new Store(getters);
   store.getters = {
-    getUserKind: jest.fn(),
     ...getters,
   };
   return mount(FacilityAppBarPage, {

@@ -74,7 +74,7 @@ class TasksViewSet(viewsets.GenericViewSet):
 
             # Make sure the job's data is valid along with `enqueue_args`.
             job, enqueue_args = registered_task.validate_job_data(
-                request.user, request_data
+                request.user, request_data, request=request
             )
 
             # Make sure the user has permission to enqueue this job.

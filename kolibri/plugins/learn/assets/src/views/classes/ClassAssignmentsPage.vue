@@ -29,7 +29,8 @@
 
 <script>
 
-  import { computed, onBeforeMount, onBeforeUnmount } from 'vue';
+  import { computed, onBeforeUnmount } from 'vue';
+  import { useTimeoutPoll } from '@vueuse/core';
   import KBreadcrumbs from 'kolibri-design-system/lib/KBreadcrumbs';
   import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
 
@@ -64,25 +65,14 @@
       const className = computed(() => (classroom.value ? classroom.value.name : ''));
       const activeLessons = computed(() => getClassActiveLessons(classId.value));
       const activeQuizzes = computed(() => getClassActiveQuizzes(classId.value));
-      let pollTimeoutId;
 
-      function schedulePoll() {
-        pollTimeoutId = setTimeout(pollForUpdates, 30000);
-      }
+      const polling = useTimeoutPoll(
+        () => fetchClass({ classId: classId.value, force: true }),
+        30000,
+      );
+      polling.resume();
 
-      function pollForUpdates() {
-        fetchClass({ classId, force: true }).then(() => {
-          schedulePoll();
-        });
-      }
-
-      onBeforeMount(() => {
-        pollForUpdates();
-      });
-
-      onBeforeUnmount(() => {
-        clearTimeout(pollTimeoutId);
-      });
+      onBeforeUnmount(polling.pause);
 
       return {
         className,

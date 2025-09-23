@@ -30,7 +30,7 @@ help:
 	@echo "Development"
 	@echo "-----------"
 	@echo ""
-	@echo "lint: check Python style with flake8"
+	@echo "lint: lint and format the codebase with pre-commit hooks"
 	@echo "test: run tests quickly with the default Python"
 	@echo "test-all: run tests on every Python version with Tox"
 	@echo "test-with-postgres: run tests quickly with a temporary postgresql backend"
@@ -85,8 +85,12 @@ clean-pyc:
 clean-docs:
 	$(MAKE) -C docs clean
 
+clean-test-pypi:
+	pip install pypi-cleanup==0.1.8
+	pypi-cleanup --host https://test.pypi.org --package kolibri --leave-most-recent-only --yes --do-it --username aronleqtest
+
 lint:
-	flake8 kolibri
+	pre-commit run --all-files
 
 test:
 	python -O -m pytest

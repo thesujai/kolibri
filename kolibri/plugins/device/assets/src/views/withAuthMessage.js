@@ -1,7 +1,7 @@
 import Vue from 'vue';
 import logger from 'kolibri-logging';
-import store from 'kolibri/store';
 import AuthMessage from 'kolibri/components/AuthMessage';
+import useUser from 'kolibri/composables/useUser';
 
 const logging = logger.getLogger(__filename);
 
@@ -15,6 +15,7 @@ const roleToGetterMap = {
 // or AuthMessage, depending on whether a user has permissions.
 // TODO replace with nested views
 export default function withAuthMessage(component, authorizedRole) {
+  const useUserObject = useUser();
   const originalProps = component.props || [];
   const originalMethods = component.methods || [];
   return Vue.component('WithAuthMessage', {
@@ -30,7 +31,7 @@ export default function withAuthMessage(component, authorizedRole) {
       const getterName = roleToGetterMap[authorizedRole];
 
       if (getterName) {
-        const getter = store.getters[getterName];
+        const getter = useUserObject[getterName]?.value;
         if (getter) {
           canAccess = () => getter;
         } else {

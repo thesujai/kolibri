@@ -124,8 +124,8 @@
     mixins: [commonCoreStrings, taskNotificationMixin],
     setup() {
       useContentTasks();
-      const { isLearnerOnlyImport } = useUser();
-      return { isLearnerOnlyImport };
+      const { isLearnerOnlyImport, user_id } = useUser();
+      return { isLearnerOnlyImport, userId: user_id };
     },
     data() {
       return {
@@ -181,7 +181,7 @@
       welcomeModalVisible() {
         return (
           this.welcomeModalVisibleState &&
-          window.localStorage.getItem(welcomeDismissalKey) !== 'true' &&
+          window.localStorage.getItem(`${welcomeDismissalKey}-${this.userId}`) !== 'true' &&
           (!this.installedChannelsWithResources.length > 0) & !this.isLearnerOnlyImport
         );
       },
@@ -215,7 +215,7 @@
     methods: {
       ...mapActions('manageContent', ['refreshChannelList', 'startImportWorkflow']),
       hideWelcomeModal() {
-        window.localStorage.setItem(welcomeDismissalKey, true);
+        window.localStorage.setItem(`${welcomeDismissalKey}-${this.userId}`, true);
         this.$store.commit('SET_WELCOME_MODAL_VISIBLE', false);
       },
       handleSelect({ value }) {

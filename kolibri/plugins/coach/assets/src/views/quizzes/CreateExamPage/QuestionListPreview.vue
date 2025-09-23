@@ -119,12 +119,10 @@
       >
         {{ displayQuestionTitle(currentQuestion, content.title) }}
       </h3>
-      <ContentRenderer
+      <ContentViewer
         v-if="content && content.available && currentQuestion.question_id"
-        ref="contentRenderer"
-        :kind="content.kind"
+        ref="contentViewer"
         :files="content.files"
-        :available="content.available"
         :extraFields="content.extra_fields"
         :itemId="currentQuestion.question_id"
         :assessment="true"

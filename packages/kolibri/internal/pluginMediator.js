@@ -1,11 +1,10 @@
 import Vue from 'vue';
 import logging from 'kolibri-logging';
 import scriptLoader from 'kolibri/utils/scriptLoader';
-import { RENDERER_SUFFIX } from 'kolibri/constants';
+import { VIEWER_SUFFIX } from 'kolibri/constants';
 import { languageDirection, languageDirections, currentLanguage } from 'kolibri/utils/i18n';
-import contentRendererMixin from '../components/internal/ContentRenderer/mixin';
-import ContentRendererLoading from '../components/internal/ContentRenderer/ContentRendererLoading';
-import ContentRendererError from '../components/internal/ContentRenderer/ContentRendererError';
+import ContentViewerLoading from '../components/internal/ContentViewer/ContentViewerLoading';
+import ContentViewerError from '../components/internal/ContentViewer/ContentViewerError';
 
 const logger = logging.getLogger(__filename);
 
@@ -22,17 +21,21 @@ const publicMethods = [
   'once',
   'off',
   'registerLanguageAssets',
-  'registerContentRenderer',
+  'registerContentViewer',
   'loadDirectionalCSS',
   'ready',
 ];
 
-function mergeMixin(component) {
-  if (!component.mixins) {
-    component.mixins = [];
-  }
-  component.mixins.push(contentRendererMixin);
-  return component;
+const domParser = new DOMParser();
+
+/*
+ * JSON data that we read from Django have been passed through
+ * Django's marksafe function that escapes any HTML characters.
+ * Use the DOMParser to decode these before we read parse the JSON.
+ */
+function decodeMarkedSafeText(text) {
+  const dom = domParser.parseFromString(text, 'text/html');
+  return dom.documentElement.textContent;
 }
 
 export default function pluginMediatorFactory(facade) {
@@ -67,19 +70,19 @@ export default function pluginMediatorFactory(facade) {
     _languageAssetRegistry: {},
 
     /**
-     * Keep track of all registered content renderers.
+     * Keep track of all registered content viewers.
      */
-    _contentRendererRegistry: {},
+    _contentViewerRegistry: {},
     /**
-     * Keep track of urls for content renderers.
+     * Keep track of urls for content viewers.
      */
-    _contentRendererUrls: {},
+    _contentViewerUrls: {},
     /**
      * Public ready method - called when plugins can start operating
      */
     ready() {
       this.registerMessages();
-      this.registerAllContentRenderers();
+      this.registerAllContentViewers();
       this.setReady();
     },
 
@@ -273,7 +276,7 @@ export default function pluginMediatorFactory(facade) {
       }
       let messageMap;
       try {
-        messageMap = JSON.parse(messageElement.innerHTML.trim());
+        messageMap = JSON.parse(decodeMarkedSafeText(messageElement.innerHTML.trim()));
       } catch (e) {
         logger.error(`Error parsing language assets for ${moduleName}`);
       }
@@ -300,29 +303,29 @@ export default function pluginMediatorFactory(facade) {
       delete this._languageAssetRegistry;
     },
     /**
-     * A method for registering content renderers for asynchronous loading and track
-     * which file types we have registered renderers for.
+     * A method for registering content viewers for asynchronous loading and track
+     * which file types we have registered viewers for.
      * @param  {String} kolibriModuleName name of the module.
      * @param  {String[]} kolibriModuleUrls the URLs of the Javascript
      * files that constitute the kolibriModule
-     * @param  {String[]} contentPresets the names of presets this content renderer can render
+     * @param  {String[]} contentPresets the names of presets this content viewer can render
      */
-    registerContentRenderer(kolibriModuleName, kolibriModuleUrls, contentPresets) {
-      this._contentRendererUrls[kolibriModuleName] = kolibriModuleUrls;
+    registerContentViewer(kolibriModuleName, kolibriModuleUrls, contentPresets) {
+      this._contentViewerUrls[kolibriModuleName] = kolibriModuleUrls;
       contentPresets.forEach(preset => {
-        if (this._contentRendererRegistry[preset]) {
-          logger.warn(`Kolibri Modules: Two content renderers are registering for ${preset}`);
+        if (this._contentViewerRegistry[preset]) {
+          logger.warn(`Kolibri Modules: Two content viewers are registering for ${preset}`);
         } else {
-          this._contentRendererRegistry[preset] = kolibriModuleName;
-          Vue.component(preset + RENDERER_SUFFIX, () => ({
-            /* Check the Kolibri core app for a content renderer module that is able to
+          this._contentViewerRegistry[preset] = kolibriModuleName;
+          Vue.component(preset + VIEWER_SUFFIX, () => ({
+            /* Check the Kolibri core app for a content viewer module that is able to
              * handle the rendering of the current content node.
              */
-            component: this.retrieveContentRenderer(preset),
+            component: this.retrieveContentViewer(preset),
             // A component to use while the async component is loading
-            loading: ContentRendererLoading,
+            loading: ContentViewerLoading,
             // A component to use if the load fails
-            error: ContentRendererError,
+            error: ContentViewerError,
             // Delay before showing the loading component.
             delay: 0,
             // The error component will be displayed if a timeout is
@@ -334,44 +337,53 @@ export default function pluginMediatorFactory(facade) {
     },
 
     /**
-     * A method for reading all templates that contain metadata about content renderers
+     * A method for reading all templates that contain metadata about content viewers
      * and registering them.
      */
-    registerAllContentRenderers() {
-      const contentRendererElements = Array.from(
+    registerAllContentViewers() {
+      const contentViewerElements = Array.from(
         document.querySelectorAll('template[data-viewer]') || [],
       );
-      for (const element of contentRendererElements) {
+      for (const element of contentViewerElements) {
         const moduleName = element.getAttribute('data-viewer');
         try {
-          const data = JSON.parse(element.innerHTML.trim());
+          const data = JSON.parse(decodeMarkedSafeText(element.innerHTML.trim()));
           const presets = data.presets;
           const urls = data.urls;
-          this.registerContentRenderer(moduleName, urls, presets);
+          this.registerContentViewer(moduleName, urls, presets);
         } catch (e) {
-          logger.error(`Error parsing content renderer for ${moduleName}`);
+          logger.error(`Error parsing content viewer for ${moduleName}`);
         }
       }
     },
 
     /**
-     * A method to retrieve a content renderer component.
+     * A method to retrieve a content viewer component.
      * @param  {String} preset    content preset
-     * @return {Promise}          Promise that resolves with loaded content renderer Vue component
+     * @return {Promise}          Promise that resolves with loaded content viewer Vue component
      */
-    retrieveContentRenderer(preset) {
+    retrieveContentViewer(preset) {
       return new Promise((resolve, reject) => {
-        const kolibriModuleName = this._contentRendererRegistry[preset];
+        const kolibriModuleName = this._contentViewerRegistry[preset];
+        function resolveComponent(module) {
+          if (module.viewerComponent) {
+            resolve(module.viewerComponent);
+          } else {
+            reject(
+              `Content viewer registered for ${preset} but no viewerComponent found in module ${kolibriModuleName}`,
+            );
+          }
+        }
         if (!kolibriModuleName) {
-          // Our content renderer registry does not have a renderer for this content preset.
-          reject(`No registered content renderer available for preset: ${preset}`);
+          // Our content viewer registry does not have a viewer for this content preset.
+          reject(`No registered content viewer available for preset: ${preset}`);
         } else if (this._kolibriModuleRegistry[kolibriModuleName]) {
-          // There is a named renderer for this preset, and it is already loaded.
-          resolve(mergeMixin(this._kolibriModuleRegistry[kolibriModuleName].rendererComponent));
+          // There is a named viewer for this preset, and it is already loaded.
+          resolveComponent(this._kolibriModuleRegistry[kolibriModuleName]);
         } else {
-          // We have a content renderer for this, but it has not been loaded, so load it, and then
+          // We have a content viewer for this, but it has not been loaded, so load it, and then
           // resolve the promise when it has been loaded.
-          const urls = this._contentRendererUrls[kolibriModuleName].filter(
+          const urls = this._contentViewerUrls[kolibriModuleName].filter(
             url =>
               // By default we load CSS for the particular direction that the user interface
               // is set to so we filter CSS files that do not match the current language direction.
@@ -401,41 +413,37 @@ export default function pluginMediatorFactory(facade) {
               // Either store them immediately on the module, if it is loaded
               if (this._kolibriModuleRegistry[kolibriModuleName]) {
                 storeTags(this._kolibriModuleRegistry[kolibriModuleName]);
-                resolve(
-                  mergeMixin(this._kolibriModuleRegistry[kolibriModuleName].rendererComponent),
-                );
+                resolveComponent(this._kolibriModuleRegistry[kolibriModuleName]);
               } else {
                 // Or wait until the module has been registered
                 this.on('kolibri_register', moduleName => {
                   if (moduleName === kolibriModuleName) {
                     storeTags(this._kolibriModuleRegistry[kolibriModuleName]);
-                    resolve(
-                      mergeMixin(this._kolibriModuleRegistry[kolibriModuleName].rendererComponent),
-                    );
+                    resolveComponent(this._kolibriModuleRegistry[kolibriModuleName]);
                   }
                 });
               }
             })
             .catch(error => {
               logger.error('Kolibri Modules: ' + error);
-              reject('Content renderer failed to load properly');
+              reject('Content viewer failed to load properly');
             });
         }
       });
     },
     /*
-     * Method to load the direction specific CSS for a particular content renderer
-     * @param {ContentRendererModule} contentRendererModule The content renderer module to load the
+     * Method to load the direction specific CSS for a particular content viewer
+     * @param {ContentViewerModule} contentViewerModule The content viewer module to load the
      * css for
      * @param {String} direction Must be one of languageDirections.RTL or LTR
      * @return {Promise} Promise that resolves when new CSS has loaded
      */
-    loadDirectionalCSS(contentRendererModule, direction) {
+    loadDirectionalCSS(contentViewerModule, direction) {
       return new Promise((resolve, reject) => {
-        if (!contentRendererModule.urlTags) {
-          reject(`${contentRendererModule.name} has not already loaded - improper method call`);
+        if (!contentViewerModule.urlTags) {
+          reject(`${contentViewerModule.name} has not already loaded - improper method call`);
         }
-        const urls = this._contentRendererUrls[contentRendererModule.name];
+        const urls = this._contentViewerUrls[contentViewerModule.name];
         // Find the URL for the specified direction
         // Note that this will only work if we have one CSS file per module - which is
         // currently the case
@@ -454,19 +462,19 @@ export default function pluginMediatorFactory(facade) {
               !url.includes(languageDirections.RTL) &&
               url.endsWith('css')),
         );
-        if (!cssUrl || contentRendererModule.urlTags[cssUrl]) {
+        if (!cssUrl || contentViewerModule.urlTags[cssUrl]) {
           // There is no css file to try to load or
           // this css file is already loaded and in the DOM, nothing to do.
           resolve();
         } else {
           // First unload the other direction CSS from the DOM
-          if (contentRendererModule.urlTags[otherCssUrl]) {
-            contentRendererModule.urlTags[otherCssUrl].remove();
-            delete contentRendererModule.urlTags[otherCssUrl];
+          if (contentViewerModule.urlTags[otherCssUrl]) {
+            contentViewerModule.urlTags[otherCssUrl].remove();
+            delete contentViewerModule.urlTags[otherCssUrl];
           }
           // Now load the new CSS and keep track of it for future unloading.
           scriptLoader(cssUrl).then(tag => {
-            contentRendererModule.urlTags[cssUrl] = tag;
+            contentViewerModule.urlTags[cssUrl] = tag;
             resolve();
           });
         }

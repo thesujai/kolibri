@@ -1,6 +1,7 @@
 import { get, set } from '@vueuse/core';
 import omit from 'lodash/omit';
 import client from 'kolibri/client';
+import { UserKinds } from 'kolibri/constants';
 import { coreStoreFactory as makeStore } from 'kolibri/store';
 import useUser, { useUserMock } from 'kolibri/composables/useUser'; // eslint-disable-line
 import useTotalProgress, { useTotalProgressMock } from 'kolibri/composables/useTotalProgress'; // eslint-disable-line
@@ -489,9 +490,10 @@ describe('useProgressTracking composable', () => {
       expect(get(totalProgressMock.totalProgress)).toEqual(0);
     });
     it('should update total progress if the backend returns complete and was not complete and user is logged in', async () => {
-      const { updateContentSession, store } = await initStore();
-      useUser.mockImplementation(() => useUserMock({ isUserLoggedIn: true }));
-      store.commit('CORE_SET_SESSION', { kind: ['learner'] });
+      const { updateContentSession } = await initStore();
+      useUser.mockImplementation(() =>
+        useUserMock({ isUserLoggedIn: true, kind: [UserKinds.LEARNER] }),
+      );
       set(totalProgressMock.totalProgress, 0);
       client.__setPayload({
         complete: true,
@@ -508,8 +510,10 @@ describe('useProgressTracking composable', () => {
       expect(get(progress)).toEqual(1);
     });
     it('should not update total progress if the backend returns complete and was already complete', async () => {
-      const { updateContentSession, store } = await initStore({ complete: true });
-      store.commit('CORE_SET_SESSION', { kind: ['learner'] });
+      const { updateContentSession } = await initStore({ complete: true });
+      useUser.mockImplementation(() =>
+        useUserMock({ isUserLoggedIn: true, kind: [UserKinds.LEARNER] }),
+      );
       set(totalProgressMock.totalProgress, 0);
       client.__setPayload({
         complete: true,

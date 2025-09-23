@@ -9,6 +9,7 @@
     <transition :name="showAppNavView ? 'bottom-nav' : 'side-nav'">
       <div
         v-show="navShown"
+        ref="sideNavInside"
         class="side-nav"
         :class="showAppNavView ? 'bottom-offset' : ''"
         :style="{
@@ -101,6 +102,7 @@
                   :icon="item.icon"
                   :linkActive="item.active"
                   data-test="side-nav-item"
+                  :data-onboarding-id="item.label === 'Device' ? 'deviceMenuOption' : null"
                   @toggleMenu="toggleNav"
                 />
                 <SideNavDivider />
@@ -245,6 +247,11 @@
       :style="{ color: $themeTokens.text }"
       @cancel="languageModalShown = false"
     />
+    <TooltipTour
+      v-if="tourActive && isTourActive('SideNavigation') && !isLearner"
+      page="SideNavigation"
+      @tourEnded="endTour('SideNavigation')"
+    />
   </div>
 
 </template>
@@ -266,6 +273,10 @@
   import useNav from 'kolibri/composables/useNav';
   import useUser from 'kolibri/composables/useUser';
   import useUserSyncStatus from 'kolibri/composables/useUserSyncStatus';
+  import { useSwipe } from '@vueuse/core';
+  import { ref, getCurrentInstance } from 'vue';
+  import TooltipTour from 'kolibri/components/onboarding/TooltipTour';
+  import useTour from 'kolibri/composables/useTour';
   import SyncStatusDisplay from '../../../SyncStatusDisplay';
   import LearnOnlyDeviceNotice from './LearnOnlyDeviceNotice';
   import TotalPoints from './TotalPoints';
@@ -296,9 +307,24 @@
       TotalPoints,
       LanguageSwitcherModal,
       BottomNavigationBar,
+      TooltipTour,
     },
     mixins: [commonCoreStrings],
-    setup() {
+    setup(props, { emit }) {
+      const instance = getCurrentInstance();
+      const isRtl = instance?.proxy.isRtl;
+
+      const sideNavInside = ref(null);
+      useSwipe(sideNavInside, {
+        threshold: 100,
+        onSwipeEnd: (e, direction) => {
+          if (direction === 'left' && !isRtl) {
+            emit('toggleSideNav');
+          } else if (direction === 'right' && isRtl) {
+            emit('toggleSideNav');
+          }
+        },
+      });
       const { windowIsSmall, windowIsLarge } = useKResponsiveWindow();
       const {
         canManageContent,
@@ -313,6 +339,7 @@
       } = useUser();
       const { status, lastSynced } = useUserSyncStatus();
       const { topBarHeight, navItems } = useNav();
+      const { startTour, tourActive, isTourActive, endTour } = useTour();
       return {
         fullName: full_name,
         username,
@@ -330,6 +357,11 @@
         userSyncStatus: status,
         userLastSynced: lastSynced,
         navItems,
+        sideNavInside,
+        startTour,
+        tourActive,
+        isTourActive,
+        endTour,
       };
     },
     props: {
@@ -413,6 +445,7 @@
         this.$nextTick(() => {
           if (isShown) {
             this.focusFirstEl();
+            this.startTour('SideNavigation');
           }
         });
       },

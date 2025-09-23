@@ -56,14 +56,12 @@
               :selectedInteractionIndex="interactionIndex"
               @select="navigateToNewInteraction($event)"
             />
-            <ContentRenderer
+            <ContentViewer
               v-if="currentInteraction"
               :itemId="currentLearner.item"
               :assessment="true"
               :allowHints="false"
-              :kind="exercise.kind"
               :files="exercise.files"
-              :available="exercise.available"
               :answerState="answerState"
               :showCorrectAnswer="showCorrectAnswer"
               :interactive="false"

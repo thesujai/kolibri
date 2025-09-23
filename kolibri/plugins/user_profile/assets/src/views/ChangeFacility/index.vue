@@ -35,8 +35,8 @@
     components: { NotificationsRoot, ImmersivePage },
     mixins: [commonCoreStrings],
     setup() {
-      const { session, getUserKind } = useUser();
-      return { session, getUserKind };
+      const { session, userKind } = useUser();
+      return { session, userKind };
     },
     data() {
       return {
@@ -116,7 +116,7 @@
             username: this.session.username,
             fullname: this.session.full_name,
             userId: this.session.user_id,
-            role: this.getUserKind,
+            role: this.userKind,
           },
         });
       }

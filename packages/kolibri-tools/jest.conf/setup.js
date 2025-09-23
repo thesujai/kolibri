@@ -46,9 +46,9 @@ Vue.use(VueRouter);
 Vue.use(VueMeta);
 Vue.use(KThemePlugin);
 
-Vue.component('ContentRenderer', {
+Vue.component('ContentViewer', {
   render(h) {
-    return h('p', 'ContentRenderer');
+    return h('p', 'ContentViewer');
   },
 });
 

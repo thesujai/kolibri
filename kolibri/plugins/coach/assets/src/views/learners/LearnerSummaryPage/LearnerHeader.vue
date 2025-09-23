@@ -55,8 +55,11 @@
           </p>
           <div class="value-box">
             <p class="value">{{ lessonsCompleted }}</p>
-            <p style="display: inline; word-wrap: break-word">
-              {{ $tr('totalLessons', { total: lessons.length }) }}
+            <p
+              v-if="learnerLessons.length > 0"
+              style="display: inline; word-wrap: break-word"
+            >
+              {{ $tr('totalLessons', { total: learnerLessons.length }) }}
             </p>
           </div>
         </div>
@@ -121,6 +124,13 @@
       ReportsControls,
     },
     mixins: [commonCoach, commonCoreStrings],
+    // A list of all lessons assigned to the relevant Learner
+    props: {
+      learnerLessons: {
+        type: Array,
+        required: true,
+      },
+    },
     computed: {
       learner() {
         return this.learnerMap[this.$route.params.learnerId];
@@ -129,9 +139,12 @@
         return this.contentStatuses.filter(status => this.learner.id === status.learner_id);
       },
       lessonsCompleted() {
+        const learnerLessonIds = this.learnerLessons.map(l => l.id);
         const statuses = this.lessonStatuses.filter(
           status =>
-            this.learner.id === status.learner_id && status.status === this.STATUSES.completed,
+            status.status === this.STATUSES.completed &&
+            status.learner_id === this.learner.id &&
+            learnerLessonIds.includes(status.lesson_id),
         );
         if (!statuses.length) {
           return 0;

@@ -1,6 +1,16 @@
 import logging
 import os
 import signal
+
+try:
+    import select
+except ImportError:
+    select = None
+else:
+    try:
+        epoll = select.epoll
+    except AttributeError:
+        epoll = None
 import socket
 import sys
 import threading
@@ -673,10 +683,12 @@ def wait_for_status(target, timeout=10):
     return False
 
 
+_on_windows = sys.platform == "win32"
+
 # The SIGKILL signal does not exist on windows
 # We use CTRL_C_EVENT instead, as it is intended
 # to be passed to the os.kill command.
-if sys.platform == "win32":
+if _on_windows:
     SIGKILL = signal.CTRL_C_EVENT
 else:
     SIGKILL = signal.SIGKILL
@@ -768,6 +780,83 @@ class BaseKolibriProcessBus(ProcessBus):
     def run(self):
         self.graceful()
         self.block()
+
+    def wait(self, state, interval=0.1, channel=None, sleep=False):  # noqa: C901
+        """Poll for the given state(s) at intervals; publish to channel.
+
+        If sleep is True, the calling thread loops, sleeping for the given
+        interval each time, then returning only when the bus state is
+        one of the given states to wait for.
+
+        If sleep is False (the default) and the operating system supports
+        I/O multiplexing via the 'select' module, then an anonymous pipe
+        will be used to signal the waiting thread to wake up whenever
+        the state transitions. This allows the waiting thread to return
+        when the bus shuts down, for example, rather than waiting for
+        the sleep interval to elapse first. Each thread that calls wait()
+        creates a new pipe, so if file descriptors are in short supply
+        on your system you might need to use sleep instead.
+
+        This method has been vendored from magicbus as it has an extant bug that
+        causes high CPU usage on Windows, due to the use of select() on a non-socket fd.
+        The original code erroneously assumes that importing select on Windows will fail.
+        """
+        if isinstance(state, (tuple, list)):
+            _states_to_wait_for = state
+        else:
+            _states_to_wait_for = [state]
+
+        _use_select = select and not _on_windows
+
+        if _use_select:
+            pipe = os.pipe()
+            read_fd, write_fd = pipe
+            self._state_transition_pipes.add(pipe)
+            if epoll:
+                poller = epoll(1)
+                poller.register(read_fd, select.EPOLLIN)
+
+        def _wait():
+            try:
+                while self.state not in _states_to_wait_for:
+                    if _use_select:
+                        try:
+                            if epoll:
+                                readers = poller.poll(interval)
+                            else:
+                                readers = select.select([read_fd], [], [], interval)[0]
+                            if readers:
+                                os.read(read_fd, 1)
+                        except (select.error, OSError):
+                            # Interrupted due to a signal (being handled by some
+                            # other thread). No need to panic, here, just check
+                            # the new state and proceed/return.
+                            pass
+                    else:
+                        time.sleep(interval)
+                    self.publish(channel)
+            finally:
+                if _use_select:
+                    self._state_transition_pipes.discard(pipe)
+                    if epoll:
+                        poller.close()
+                    # NOTE: Closing the write file descriptor first
+                    # NOTE: to prevent "Broken pipe" in `self._transition()`.
+                    os.close(write_fd)
+                    os.close(read_fd)
+
+        # From http://psyco.sourceforge.net/psycoguide/bugs.html:
+        # "The compiled machine code does not include the regular polling
+        # done by Python, meaning that a KeyboardInterrupt will not be
+        # detected before execution comes back to the regular Python
+        # interpreter. Your program cannot be interrupted if caught
+        # into an infinite Psyco-compiled loop."
+        try:
+            sys.modules["psyco"].cannotcompile(_wait)
+        except (KeyError, AttributeError):
+            pass
+
+        _wait()
 
 
 class KolibriServicesProcessBus(BaseKolibriProcessBus):

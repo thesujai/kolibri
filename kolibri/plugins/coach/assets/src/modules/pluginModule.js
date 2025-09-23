@@ -57,12 +57,12 @@ export default {
       return state.classList.length !== 1;
     },
     userIsAuthorizedForCoach(state, getters, rootState) {
-      const { isAdmin, isSuperuser, isCoach, facility_id } = useUser();
+      const { isAdmin, isSuperuser, isCoach, userFacilityId } = useUser();
       if (get(isSuperuser)) {
         return true;
       } else if (get(isCoach) || get(isAdmin)) {
         return (
-          rootState.route.params.facilityId === get(facility_id) ||
+          rootState.route.params.facilityId === get(userFacilityId) ||
           !rootState.route.params.facilityId
         );
       }

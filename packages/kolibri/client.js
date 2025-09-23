@@ -41,16 +41,16 @@ baseClient.interceptors.response.use(
     // if they were logged in.
     if (error.response) {
       if (error.response.status === 403) {
-        const { id, user_id } = useUser();
-        if (get(id) && !get(user_id)) {
-          // We have session information but no user_id, which means we are not logged in
+        const { sessionId, currentUserId } = useUser();
+        if (get(sessionId) && !get(currentUserId)) {
+          // We have session information but no currentUserId, which means we are not logged in
           // This is a sign that the user has been logged out due to inactivity
           heartbeat.signOutDueToInactivity();
         } else {
           // In this case, we should check right now if they are still logged in
           heartbeat.pollSessionEndPoint().then(() => {
             // If they are not, we should handle sign out
-            if (!get(user_id)) {
+            if (!get(currentUserId)) {
               heartbeat.signOutDueToInactivity();
             }
           });

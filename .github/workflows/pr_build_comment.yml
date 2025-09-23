@@ -11,10 +11,10 @@ jobs:
     name: Add build artifact PR comment
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Make text for build comment
         id: comment-text
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const utils = require('./.github/githubUtils.js')
@@ -23,7 +23,7 @@ jobs:
         run: unzip pr_number.zip
       - name: Get PR number
         id: pr-number
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
@@ -31,14 +31,14 @@ jobs:
             return prNumber
       - name: Find build comment
         id: find-comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const utils = require('./.github/githubUtils.js')
             return await utils.findComment(github, context, ${{steps.pr-number.outputs.result}})
       - name: Create build comment
         if: ${{!steps.find-comment.outputs.result}}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -50,7 +50,7 @@ jobs:
               })
       - name: Update build comment
         if: ${{steps.find-comment.outputs.result}}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

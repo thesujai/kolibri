@@ -169,6 +169,10 @@
         type: String,
         required: true,
       },
+      currentQuestionAnswered: {
+        type: Boolean,
+        required: true,
+      },
       // hack to get access to the scrolling pane
       wrapperComponentRefs: {
         type: Object,
@@ -246,6 +250,9 @@
         return this.questionNumberLabel$({ questionNumber: num });
       },
       isAnswered(question) {
+        if (question.item === this.questionItem && this.currentQuestionAnswered) {
+          return this.currentQuestionAnswered;
+        }
         const attempt = this.pastattempts.find(attempt => attempt.item === question.item);
         return attempt && attempt.answer;
       },

@@ -70,6 +70,18 @@
           </div>
         </div>
       </KRouterLink>
+      <div
+        v-if="contentNodes.length && moreContentNodesAvailable"
+        class="view-more-container"
+      >
+        <KButton
+          v-if="!moreContentNodesLoading"
+          :text="coreString('viewMoreAction')"
+          appearance="basic-link"
+          @click="$emit('loadMoreContentNodes')"
+        />
+        <KCircularLoader v-else />
+      </div>
     </div>
 
     <KCircularLoader v-else-if="loading" />
@@ -110,11 +122,12 @@
 
 <script>
 
-  import isBoolean from 'lodash/isBoolean';
   import TimeDuration from 'kolibri-common/components/TimeDuration';
   import useKResponsiveWindow from 'kolibri-design-system/lib/composables/useKResponsiveWindow';
   import MissingResourceAlert from 'kolibri-common/components/MissingResourceAlert';
   import LearningActivityIcon from 'kolibri-common/components/ResourceDisplayAndSearch/LearningActivityIcon.vue';
+  import { validateObject } from 'kolibri/utils/objectSpecs';
+  import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
   import useContentNodeProgress from '../composables/useContentNodeProgress';
   import useContentLink from '../composables/useContentLink';
   import ProgressBar from './ProgressBar';
@@ -127,6 +140,7 @@
       TimeDuration,
       MissingResourceAlert,
     },
+    mixins: [commonCoreStrings],
     setup() {
       const { contentNodeProgressMap } = useContentNodeProgress();
       const { genContentLinkKeepCurrentBackLink, genContentLinkKeepPreviousBackLink } =
@@ -148,18 +162,44 @@
         type: Array,
         required: true,
         default: () => [],
+        validator: function (nodes) {
+          return nodes.every(node =>
+            validateObject(node, {
+              id: { type: String, required: true },
+              title: { type: String, required: true },
+              duration: { type: Number, required: false, default: 0 },
+              progress: { type: Number, required: false, default: 0 },
+              is_leaf: { type: Boolean, required: true },
+              learning_activities: { type: Array, required: false, default: () => [] },
+            }),
+          );
+        },
       },
-      /** Content node with the following properties: id, is_leaf, title */
-      nextFolder: {
-        type: Object, // or falsy
+      /**
+       * The "more" object from the API response if additional content nodes
+       * are available; otherwise, null. If non-null, a "View More" button
+       * will be displayed at the bottom of the list of contentNodes.
+       */
+      moreContentNodesAvailable: {
+        type: Object,
         required: false,
-        default: () => {},
-        validator(node) {
-          if (!node) {
-            return true;
-          } // falsy ok
-          const { id, is_leaf, title } = node;
-          return id && isBoolean(is_leaf) && title;
+        default: null,
+      },
+      moreContentNodesLoading: {
+        type: Boolean,
+        default: false,
+      },
+      nextFolder: {
+        type: Object,
+        required: false,
+        default: () => ({}),
+        validator: function (node) {
+          if (!node) return true; // falsy values are acceptable
+          return validateObject(node, {
+            id: { type: String, required: true },
+            is_leaf: { type: Boolean, required: true },
+            title: { type: String, required: true },
+          });
         },
       },
       isLesson: {
@@ -276,6 +316,15 @@
     width: 100%;
     min-height: 72px;
     padding: 20px 0;
+  }
+
+  .view-more-container {
+    position: relative;
+    left: 10px;
+    display: grid;
+    justify-content: flex-start;
+    width: 100%;
+    padding-bottom: 20px;
   }
 
   .activity-icon,

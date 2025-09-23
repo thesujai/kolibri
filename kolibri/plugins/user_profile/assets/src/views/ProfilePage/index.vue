@@ -46,7 +46,7 @@
             <td>
               <UserTypeDisplay
                 :distinguishCoachTypes="false"
-                :userType="getUserKind"
+                :userType="userKind"
               />
             </td>
           </tr>
@@ -186,7 +186,7 @@
 
   import NotificationsRoot from 'kolibri/components/pages/NotificationsRoot';
   import AppBarPage from 'kolibri/components/pages/AppBarPage';
-  import { ref } from 'vue';
+  import { computed, ref } from 'vue';
   import find from 'lodash/find';
   import pickBy from 'lodash/pickBy';
   import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
@@ -226,8 +226,8 @@
       const { currentUser } = useCurrentUser();
       const {
         isLearnerOnlyImport,
-        getUserKind,
-        getUserPermissions,
+        userKind,
+        userPermissions: _userPermissions,
         isCoach,
         isSuperuser,
         userHasPermissions,
@@ -237,12 +237,14 @@
       const { fetchPoints, totalPoints } = useTotalProgress();
       const { facilityConfig, facilities } = useFacilities();
 
+      const userPermissions = computed(() => pickBy(_userPermissions));
+
       return {
         currentUser,
         onMyOwnSetup,
         isLearnerOnlyImport,
-        getUserKind,
-        getUserPermissions,
+        userKind,
+        userPermissions,
         isCoach,
         isSuperuser,
         userHasPermissions,
@@ -258,9 +260,6 @@
     computed: {
       profileEditRoute() {
         return this.$router.getRoute(RoutesMap.PROFILE_EDIT);
-      },
-      userPermissions() {
-        return pickBy(this.getUserPermissions);
       },
       facilityName() {
         const match = find(this.facilities, {

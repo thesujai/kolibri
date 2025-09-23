@@ -2,7 +2,6 @@
 
   <KModal
     :title="$tr('welcomeModalHeader')"
-    :submitText="coreString('continueAction')"
     @submit="$emit('submit')"
   >
     <p
@@ -12,6 +11,11 @@
     >
       {{ paragraph }}
     </p>
+    <template #actions>
+      <KButton @click="$emit('submit')">
+        {{ coreString('continueAction') }}
+      </KButton>
+    </template>
   </KModal>
 
 </template>
@@ -20,6 +24,7 @@
 <script>
 
   import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
+  import { kolibriOnboardingGuideStrings } from 'kolibri/uiText/kolibriOnboardingGuideStrings';
   import useUser from 'kolibri/composables/useUser';
   import useFacilities from 'kolibri-common/composables/useFacilities';
 
@@ -27,9 +32,17 @@
     name: 'WelcomeModal',
     mixins: [commonCoreStrings],
     setup() {
-      const { isLearnerOnlyImport } = useUser();
+      const { isLearnerOnlyImport, isLearner } = useUser();
       const { facilities } = useFacilities();
-      return { isLearnerOnlyImport, facilities };
+      const { onMyOwnWelcomeMessage$, HomePageWelcomeMessage$ } = kolibriOnboardingGuideStrings;
+
+      return {
+        isLearnerOnlyImport,
+        facilities,
+        isLearner,
+        onMyOwnWelcomeMessage$,
+        HomePageWelcomeMessage$,
+      };
     },
     props: {
       importedFacility: {
@@ -53,8 +66,11 @@
               : this.$tr('postSyncWelcomeMessage2', { facilityName: facility.name });
           return [this.$tr('learnOnlyDeviceWelcomeMessage1'), sndParagraph];
         }
+        if (this.isLearner) {
+          return [this.HomePageWelcomeMessage$({ facilityName: '' })];
+        }
         if (this.isOnMyOwnUser) {
-          return [this.coreString('nothingInLibraryLearner')];
+          return [this.onMyOwnWelcomeMessage$()];
         }
         if (this.importedFacility) {
           return [

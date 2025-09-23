@@ -1,38 +1,135 @@
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import client from 'kolibri/client';
+import { browser, os } from 'kolibri/utils/browserInfo';
+import { setServerTime } from 'kolibri/utils/serverClock';
+import redirectBrowser from 'kolibri/utils/redirectBrowser';
+import CatchErrors from 'kolibri/utils/CatchErrors';
+import Lockr from 'lockr';
+import urls from 'kolibri/urls';
 import store from 'kolibri/store';
+import { LoginErrors, ERROR_CONSTANTS, UPDATE_MODAL_DISMISSED, UserKinds } from 'kolibri/constants';
+import { pick } from 'lodash';
+
+// Base session state (migrated from session module)
+const baseSessionState = {
+  app_context: false,
+  can_manage_content: false,
+  facility_id: undefined,
+  full_name: '',
+  id: undefined,
+  kind: [UserKinds.ANONYMOUS],
+  user_id: undefined,
+  username: '',
+  full_facility_import: true,
+};
+
+// Module-level state
+const sessionState = ref({ ...baseSessionState });
 
 export default function useUser() {
-  //getters
-  const isUserLoggedIn = computed(() => store.getters.isUserLoggedIn);
-  const currentUserId = computed(() => store.getters.currentUserId);
-  const isLearnerOnlyImport = computed(() => store.getters.isLearnerOnlyImport);
-  const isCoach = computed(() => store.getters.isCoach);
-  const isAdmin = computed(() => store.getters.isAdmin);
-  const isSuperuser = computed(() => store.getters.isSuperuser);
-  const canManageContent = computed(() => store.getters.canManageContent);
-  const isAppContext = computed(() => store.getters.isAppContext);
-  const isClassCoach = computed(() => store.getters.isClassCoach);
-  const isFacilityCoach = computed(() => store.getters.isFacilityCoach);
-  const isLearner = computed(() => store.getters.isLearner);
-  const isFacilityAdmin = computed(() => store.getters.isFacilityAdmin);
-  const getUserPermissions = computed(() => store.getters.getUserPermissions);
-  const userFacilityId = computed(() => store.getters.userFacilityId);
-  const getUserKind = computed(() => store.getters.getUserKind);
-  const userHasPermissions = computed(() => store.getters.userHasPermissions);
-  const session = computed(() => store.getters.session);
+  // Session state
+  const session = computed(() => sessionState.value);
+  const full_name = computed(() => sessionState.value.full_name);
+  const sessionId = computed(() => sessionState.value.id);
+  const kind = computed(() => sessionState.value.kind);
+  const username = computed(() => sessionState.value.username);
 
-  //state
-  const app_context = computed(() => store.getters.session.app_context);
-  const can_manage_content = computed(() => store.getters.session.can_manage_content);
-  const facility_id = computed(() => store.getters.session.facility_id);
-  const full_name = computed(() => store.getters.session.full_name);
-  const id = computed(() => store.getters.session.id);
-  const kind = computed(() => store.getters.session.kind);
-  const user_id = computed(() => store.getters.session.user_id);
-  const full_facility_import = computed(() => store.getters.session.full_facility_import);
-  const username = computed(() => store.getters.session.username);
+  // Derived state
+  const isUserLoggedIn = computed(() => !kind.value.includes(UserKinds.ANONYMOUS));
+  const currentUserId = computed(() => sessionState.value.user_id);
+  const isLearnerOnlyImport = computed(() => !sessionState.value.full_facility_import);
+  const isCoach = computed(
+    () => kind.value.includes(UserKinds.COACH) || kind.value.includes(UserKinds.ASSIGNABLE_COACH),
+  );
+  const isAdmin = computed(
+    () => kind.value.includes(UserKinds.ADMIN) || kind.value.includes(UserKinds.SUPERUSER),
+  );
+  const isSuperuser = computed(() => kind.value.includes(UserKinds.SUPERUSER));
+  const canManageContent = computed(() => sessionState.value.can_manage_content);
+  const isAppContext = computed(() => sessionState.value.app_context);
+  const isClassCoach = computed(() => kind.value.includes(UserKinds.ASSIGNABLE_COACH));
+  const isFacilityCoach = computed(() => kind.value.includes(UserKinds.COACH));
+  const isLearner = computed(() => kind.value.includes(UserKinds.LEARNER));
+  const isFacilityAdmin = computed(() => kind.value.includes(UserKinds.ADMIN));
+  const userPermissions = computed(() => ({ can_manage_content: canManageContent.value }));
+  const userFacilityId = computed(() => sessionState.value.facility_id);
+  const userKind = computed(() => {
+    if (isSuperuser.value) return UserKinds.SUPERUSER;
+    if (isAdmin.value) return UserKinds.ADMIN;
+    if (isCoach.value) return UserKinds.COACH;
+    if (isLearner.value) return UserKinds.LEARNER;
+    return UserKinds.ANONYMOUS;
+  });
+  const userHasPermissions = computed(() => Object.values(userPermissions.value).some(Boolean));
+
+  // Login/Logout Functions
+  async function login(sessionPayload) {
+    Lockr.set(UPDATE_MODAL_DISMISSED, false);
+    try {
+      await client({
+        data: {
+          ...sessionPayload,
+          active: true,
+          browser,
+          os,
+        },
+        url: urls['kolibri:core:session_list'](),
+        method: 'post',
+      });
+
+      if (!sessionPayload.disableRedirect) {
+        if (sessionPayload.next) {
+          // OIDC redirect
+          redirectBrowser(sessionPayload.next);
+        } else {
+          // Normal redirect on login
+          redirectBrowser();
+        }
+      }
+    } catch (error) {
+      const errorsCaught = CatchErrors(error, [
+        ERROR_CONSTANTS.INVALID_CREDENTIALS,
+        ERROR_CONSTANTS.MISSING_PASSWORD,
+        ERROR_CONSTANTS.PASSWORD_NOT_SPECIFIED,
+        ERROR_CONSTANTS.NOT_FOUND,
+      ]);
+
+      if (errorsCaught) {
+        if (errorsCaught.includes(ERROR_CONSTANTS.INVALID_CREDENTIALS)) {
+          return LoginErrors.INVALID_CREDENTIALS;
+        } else if (errorsCaught.includes(ERROR_CONSTANTS.MISSING_PASSWORD)) {
+          return LoginErrors.PASSWORD_MISSING;
+        } else if (errorsCaught.includes(ERROR_CONSTANTS.PASSWORD_NOT_SPECIFIED)) {
+          return LoginErrors.PASSWORD_NOT_SPECIFIED;
+        } else if (errorsCaught.includes(ERROR_CONSTANTS.NOT_FOUND)) {
+          return LoginErrors.USER_NOT_FOUND;
+        }
+      } else {
+        store.dispatch('handleApiError', { error });
+      }
+    }
+  }
+
+  function logout() {
+    redirectBrowser(urls['kolibri:core:logout']());
+  }
+
+  function setSession({ session: newSession, clientNow }) {
+    const serverTime = newSession.server_time;
+    if (clientNow) {
+      setServerTime(serverTime, clientNow);
+    }
+
+    sessionState.value = {
+      ...sessionState.value,
+      // Ensure only base session state keys are present
+      ...pick(newSession, Object.keys(baseSessionState)),
+    };
+  }
 
   return {
+    // Getters
+    session,
     isLearnerOnlyImport,
     isUserLoggedIn,
     currentUserId,
@@ -45,20 +142,20 @@ export default function useUser() {
     isFacilityCoach,
     isLearner,
     isFacilityAdmin,
-    getUserPermissions,
+    userPermissions,
     userFacilityId,
-    getUserKind,
+    userKind,
     userHasPermissions,
-    session,
-    //state
-    app_context,
-    can_manage_content,
-    facility_id,
+
+    // State
     full_name,
-    id,
+    sessionId,
     kind,
-    user_id,
     username,
-    full_facility_import,
+
+    // Actions
+    login,
+    logout,
+    setSession,
   };
 }

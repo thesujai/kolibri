@@ -1,0 +1,7 @@
+{
+  "version": "0.1.0",
+  "name": "kolibri-qti-viewer",
+  "description": "A plugin for rendering QTI questions",
+  "private": true,
+  "dependencies": {}
+}

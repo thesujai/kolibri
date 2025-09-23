@@ -3,10 +3,13 @@ import VueMeta from 'vue-meta';
 import VueRouter from 'vue-router';
 import Vuex from 'vuex';
 import KThemePlugin from 'kolibri-design-system/lib/KThemePlugin';
-import ContentRenderer from './components/internal/ContentRenderer';
+import logger from 'kolibri-logging';
+import ContentViewer from './components/internal/ContentViewer';
 import initializeTheme from './styles/internal/initializeTheme';
 import setupPluginMediator from './internal/pluginMediator';
 import apiSpec from './internal/apiSpec';
+
+export const logging = logger.getLogger(__filename);
 
 /**
  * Object that forms the public API for the Kolibri
@@ -32,6 +35,6 @@ Vue.use(VueMeta);
 // - Register KDS components
 Vue.use(KThemePlugin);
 
-Vue.component('ContentRenderer', ContentRenderer);
+Vue.component('ContentViewer', ContentViewer);
 
 export default coreApp;

@@ -181,7 +181,7 @@ export default class Kolibri extends BaseShim {
       /*
        * Method to set a default theme for any content rendering initiated by this app
        * @param {Theme} options - The different options for custom themeing
-       * @param {string} options.appBarColor - Color for app bar atop the renderer
+       * @param {string} options.appBarColor - Color for app bar atop the viewer
        * @param {string} options.textColor - Color for the text or icon
        * @param {string} [options.backdropColor] - Color for modal backdrop
        * @param {string} [options.backgroundColor] - Color for modal background
@@ -199,7 +199,7 @@ export default class Kolibri extends BaseShim {
        * Method to allow navigation to or rendering of a specific node
        * has optional parameter context that can update the URL for a custom context.
        * When this is called for a resource node in the custom navigation context
-       * this will launch a renderer overlay to maintain the current state, and update the
+       * this will launch a viewer overlay to maintain the current state, and update the
        * query parameters for the URL of the custom context to indicate the change
        * If called for a topic in a custom context or outside of a custom context
        * this will simply prompt navigation to that node in Kolibri.

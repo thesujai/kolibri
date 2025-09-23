@@ -66,6 +66,7 @@
       </div>
       <div
         v-if="isRemote"
+        :data-onboarding-id="isFirst ? 'wifiIconFirstChannelCard' : null"
         class="wifi-icon"
       >
         <KIcon icon="wifi" />
@@ -93,6 +94,7 @@
     setup() {
       const { windowGutter } = useKResponsiveWindow();
       const { isUserLoggedIn, isLearner } = useUser();
+
       return {
         windowGutter,
         isUserLoggedIn,
@@ -102,6 +104,10 @@
     props: {
       title: {
         type: String,
+        required: true,
+      },
+      isFirst: {
+        type: Boolean,
         required: true,
       },
       tagline: {

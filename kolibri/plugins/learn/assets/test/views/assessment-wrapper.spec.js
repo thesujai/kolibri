@@ -22,11 +22,6 @@ const createComponent = (totalattempts, pastattempts, masteryModel) => {
     pastattempts,
   };
   const store = makeStore();
-  store.state.core = {
-    session: {
-      user_id: 'test',
-    },
-  };
   const Component = Vue.extend(assessmentWrapper);
   return new Component({ propsData, store });
 };

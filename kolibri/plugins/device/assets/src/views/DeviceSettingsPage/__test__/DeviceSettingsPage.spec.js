@@ -55,9 +55,6 @@ const localVue = createLocalVue();
 localVue.use(Vuex);
 const store = new Store({
   state: {},
-  getters: {
-    isAppContext: () => false,
-  },
   actions: {
     createSnackbar() {},
   },

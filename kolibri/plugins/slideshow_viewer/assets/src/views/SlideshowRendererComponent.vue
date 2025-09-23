@@ -1,8 +1,8 @@
 <template>
 
   <CoreFullscreen
-    ref="slideshowRenderer"
-    class="slideshow-renderer"
+    ref="slideshowViewer"
+    class="slideshow-viewer"
     :style="{ height: contentHeight }"
     @changeFullscreen="isInFullscreen = $event"
   >
@@ -11,7 +11,7 @@
       :ariaLabel="isInFullscreen ? $tr('exitFullscreen') : $tr('enterFullscreen')"
       color="primary"
       size="small"
-      @click="$refs.slideshowRenderer.toggleFullscreen()"
+      @click="$refs.slideshowViewer.toggleFullscreen()"
     >
       <KIcon
         v-if="isInFullscreen"
@@ -95,6 +95,7 @@
     Navigation as HooperNavigation,
     Pagination as HooperPagination,
   } from 'hooper';
+  import useContentViewer, { contentViewerProps } from 'kolibri/composables/useContentViewer';
 
   export default {
     name: 'SlideshowRendererComponent',
@@ -106,6 +107,13 @@
       HooperPagination,
       HooperNavigation,
     },
+    setup(props, context) {
+      const { files } = useContentViewer(props, context, { defaultDuration: 300 });
+      return {
+        files,
+      };
+    },
+    props: contentViewerProps,
     data: () => ({
       isInFullscreen: false,
       slides: [],
@@ -142,13 +150,6 @@
       },
       contentHeight: function () {
         return window.innerHeight * 0.7 + 'px';
-      },
-      /**
-       * @public
-       * Note: the default duration historically for slidshows has been 5 min
-       */
-      defaultDuration() {
-        return 300;
       },
     },
     watch: {
@@ -256,7 +257,7 @@
             .getElementsByClassName('hooper-list')[0]
             .setAttribute('style', `width: calc(100% * ${this.slides.length});`);
         } catch (err) {
-          // If we don't explicitly set an error, the renderer will display broken giving worse
+          // If we don't explicitly set an error, the viewer will display broken giving worse
           // UX than getting an error message.
           this.$store.commit('CORE_SET_ERROR', err);
         }
@@ -337,7 +338,7 @@
     z-index: 12;
   }
 
-  .slideshow-renderer {
+  .slideshow-viewer {
     position: relative;
     overflow: hidden;
     text-align: center;

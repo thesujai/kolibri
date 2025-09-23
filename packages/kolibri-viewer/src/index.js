@@ -1,7 +1,7 @@
 import KolibriModule from 'kolibri-module';
 
-export default class ContentRenderer extends KolibriModule {
-  get rendererComponent() {
+export default class ContentViewer extends KolibriModule {
+  get viewerComponent() {
     return null;
   }
   loadDirectionalCSS(direction) {

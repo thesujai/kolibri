@@ -1,5 +1,6 @@
 import invert from 'lodash/invert';
 import Subjects from 'kolibri-constants/labels/Subjects';
+import LearningActivities from 'kolibri-constants/labels/LearningActivities';
 // coach-facing
 export { default as ContentNodeResourceType } from 'kolibri-constants/labels/ResourceType';
 export { default as LearningActivities } from 'kolibri-constants/labels/LearningActivities';
@@ -40,6 +41,8 @@ export const ContentNodeKinds = {
   SLIDESHOW: 'slideshow',
   BOOKMARK: 'bookmark',
 };
+
+export const ActivitiesLookup = invert(LearningActivities);
 
 export const CategoriesLookup = invert(Subjects);
 
@@ -164,7 +167,7 @@ export const ERROR_CONSTANTS = {
 
 export const ContentErrorConstants = {
   // These are constants that can be used to define the type of error that a
-  // content renderer has encountered.
+  // content viewer has encountered.
   LOADING_ERROR: 'LOADING_ERROR',
 };
 
@@ -201,4 +204,10 @@ export const MAX_QUESTIONS_PER_QUIZ_SECTION = 25;
 
 export const DisconnectionErrorCodes = [0, 502, 504, 511];
 
-export const RENDERER_SUFFIX = '_renderer';
+export const VIEWER_SUFFIX = '_viewer';
+
+// enum identifying the types of setup for Lod devices
+export const LodTypePresets = Object.freeze({
+  JOIN: 'JOIN',
+  IMPORT: 'IMPORT',
+});

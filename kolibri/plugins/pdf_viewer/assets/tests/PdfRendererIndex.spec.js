@@ -98,7 +98,7 @@ describe('PdfRendererIndex', () => {
         const wrapper = makeWrapper();
         expect(mockPDFJS.loadingDocument.onProgress).toBeDefined();
         mockPDFJS.loadingDocument.onProgress({ loaded: 1, total: 10 });
-        expect(wrapper.vm.progress).toBe(0.1);
+        expect(wrapper.vm.loadingProgress).toBe(0.1);
       });
 
       it('should show Loading component while pdf Document is loading', () => {
@@ -126,7 +126,7 @@ describe('PdfRendererIndex', () => {
         const savedLocation = 0.2;
         mockPDFJS.PdfDocument.numPages = 10;
         await loadPdfContainer({
-          data: {
+          propsData: {
             extraFields: {
               contentState: { savedLocation },
             },

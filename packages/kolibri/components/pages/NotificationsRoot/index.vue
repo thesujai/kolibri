@@ -65,12 +65,12 @@
       UpdateNotification,
     },
     setup() {
-      const { isAdmin, isSuperuser, user_id } = useUser();
+      const { isAdmin, isSuperuser, currentUserId } = useUser();
 
       return {
         isAdmin,
         isSuperuser,
-        user_id,
+        currentUserId,
       };
     },
     props: {
@@ -159,8 +159,7 @@
 
     methods: {
       async getNotifications() {
-        const { isAdmin, isSuperuser } = useUser();
-        if (isAdmin || isSuperuser) {
+        if (this.isAdmin || this.isSuperuser) {
           try {
             const notifications = await PingbackNotificationResource.fetchCollection();
             this.notifications = _notificationListState(notifications);
@@ -173,7 +172,7 @@
         try {
           await PingbackNotificationDismissedResource.saveModel({
             data: {
-              user: this.user_id,
+              user: this.currentUserId,
               notification: notificationId,
             },
           });

@@ -29,6 +29,7 @@ repos:
         entry: yarn run lint-frontend:format
         language: system
         files: \.(js|vue|scss|css)$
+        exclude: ^kolibri/plugins/qti_viewer/assets/src/components/__fixtures__/items\.js
 -   repo: local
     hooks:
     -   id: core-js-api

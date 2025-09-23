@@ -10,7 +10,7 @@ Feature: Filter panel default behaviors
   Scenario: Filters are empty by default
     Given I have not started a search
       And there are resources tagged for all available filters
-    Then I see the filter fields: *Keywords*, *Categories*, *Activities*, *Language*, *Level*, *Channel*, *Accessibility*, and *Show resources*
+    Then I see the filter fields: *Keywords*, *Categories*, *Activities*, *Language*, *Level*, *Accessibility*, and *Show resources*
       And I see all filter fields are empty
 
   Scenario: Resources on the device are available for a given filter option

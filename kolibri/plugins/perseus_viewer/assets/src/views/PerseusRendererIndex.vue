@@ -37,6 +37,7 @@
   import { Mapper, defaultFilePathMappers } from 'kolibri-zip/src/fileUtils';
   import useKResponsiveWindow from 'kolibri-design-system/lib/composables/useKResponsiveWindow';
   import { defer } from 'underscore';
+  import useContentViewer, { contentViewerProps } from 'kolibri/composables/useContentViewer';
   import { createElement as e } from 'react';
   import { createPortal, render, unmountComponentAtNode } from 'react-dom';
   import * as perseus from '@khanacademy/perseus';
@@ -243,12 +244,15 @@
 
   export default {
     name: 'PerseusRendererIndex',
-    setup() {
+    setup(props, context) {
       const { windowBreakpoint } = useKResponsiveWindow();
+      const { defaultFile } = useContentViewer(props, context);
       return {
         windowBreakpoint,
+        defaultFile,
       };
     },
+    props: contentViewerProps,
     data: () => ({
       // Is the perseus item loading?
       loading: true,

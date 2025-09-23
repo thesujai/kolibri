@@ -1,7 +1,7 @@
 <template>
 
-  <div>
-    <KGrid>
+  <div class="flex-column">
+    <KGrid v-if="$slots.otherFilter || $slots.filter">
       <KGridItem :layout12="{ span: 7 }">
         <slot name="otherFilter"></slot>
       </KGridItem>
@@ -13,7 +13,7 @@
       </KGridItem>
     </KGrid>
 
-    <div>
+    <div class="flex-column">
       <slot> </slot>
     </div>
 
@@ -137,6 +137,13 @@
     position: relative;
     top: -2px;
     display: inline;
+  }
+
+  .flex-column {
+    display: flex;
+    flex-direction: column;
+    // Min height is set to 0 to allow flex items to shrink
+    min-height: 0;
   }
 
 </style>

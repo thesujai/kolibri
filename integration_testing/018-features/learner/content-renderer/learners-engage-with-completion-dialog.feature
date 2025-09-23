@@ -4,7 +4,7 @@ Feature: Learners engages with completion dialog
     And the completion dialog appears on my screen
 
   Scenario: Learners can choose to stay and practice
-    When I click the *Stay and practice* button
+    When I click the *Stay here* button
     Then the modal dialog closes
       And I am back on the content page
 

@@ -2,22 +2,22 @@ Feature: Filter panel default behaviors
 
 # Users should only see filters and filter options for available resources on the device
 
-  Background: (MM - update to be channel specific)
+  Background:
     Given there is at least one channel loaded to the device
-    When I go to the *Topics* page by clicking a *<channel card>* within the library tab
-      And I see the filter panel on the left
+    	And I am at the channel page
+      And I see the search panel on the left
 
-  Scenario: Filters are empty by default
+  Scenario: Filters are empty/not selected by default
     Given I have not started a search
       And there are resources tagged for all available filters
-    Then I see the filter fields: *Keywords*, *Categories*, *Activities*, *Level*, *Language*, *Channel*, *Accessibility*, and *Show resources*
-      And I see all filter fields are empty
+    Then I see the filter fields: *Keywords*, *Categories*, *Activities*, *Language*, *Level*, *Accessibility*, and *Show resources*
+      And I see all filter fields are empty/not selected
 
   Scenario: Resources on the device are available for a given filter option
     Given that resources on the devices are tagged with <filter option>
     Then I see <filter option> in <filter>
 
-  Scenario: Hide filter options that are not available
+  Scenario: Filter options that which are not available are disabled
     Given there are no resources tagged with <filter option 1> in <filter>
       And there are some resources tagged with <filter option 2> in <filter>
     Then I do not see <filter option 1> in <filter>

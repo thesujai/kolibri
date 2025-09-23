@@ -1,10 +1,11 @@
+import datetime
 import logging
 import ntpath
-import os
-import shutil
 
 from django.conf import settings
+from django.core.files.storage import default_storage
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
@@ -17,6 +18,7 @@ from kolibri.core.auth.constants.user_kinds import ASSIGNABLE_COACH
 from kolibri.core.auth.constants.user_kinds import COACH
 from kolibri.core.auth.constants.user_kinds import SUPERUSER
 from kolibri.core.auth.models import Facility
+from kolibri.core.auth.models import FacilityUser
 from kolibri.core.auth.utils.sync import find_soud_sync_sessions
 from kolibri.core.auth.utils.sync import validate_and_create_sync_credentials
 from kolibri.core.auth.utils.users import get_remote_users_info
@@ -41,8 +43,6 @@ from kolibri.core.tasks.permissions import IsSuperAdmin
 from kolibri.core.tasks.permissions import NotProvisioned
 from kolibri.core.tasks.utils import get_current_job
 from kolibri.core.tasks.validation import JobValidator
-from kolibri.utils.conf import KOLIBRI_HOME
-from kolibri.utils.filesystem import mkdirp
 from kolibri.utils.time_utils import naive_utc_datetime
 from kolibri.utils.translation import gettext as _
 
@@ -126,6 +126,7 @@ class ImportUsersFromCSVValidator(JobValidator):
             raise serializers.ValidationError(
                 "One of csvfile or csvfilename must be specified"
             )
+
         facility = data.get("facility")
         if facility:
             facility_id = facility.id
@@ -133,17 +134,16 @@ class ImportUsersFromCSVValidator(JobValidator):
             facility_id = self.context["user"].facility_id
         else:
             raise serializers.ValidationError("Facility must be specified")
-        temp_dir = os.path.join(KOLIBRI_HOME, "temp")
-        mkdirp(temp_dir, exist_ok=True)
+
         if "csvfile" in data:
-            tmpfile = data["csvfile"].temporary_file_path()
-            filename = ntpath.basename(tmpfile)
-            filepath = os.path.join(temp_dir, filename)
-            shutil.copyfile(tmpfile, filepath)
+            tmp_path = data["csvfile"].temporary_file_path()
+            filename = ntpath.basename(tmp_path)
+            filepath = default_storage.save("temp/{}".format(filename), data["csvfile"])
         else:
-            filepath = os.path.join(temp_dir, data["csvfilename"])
-            if not os.path.exists(filepath):
+            filepath = "temp/{}".format(data["csvfilename"])
+            if not default_storage.exists(filepath):
                 raise serializers.ValidationError("Supplied csvfilename does not exist")
+
         args = [filepath]
         kwargs = {
             "locale": data.get("locale"),
@@ -178,15 +178,26 @@ def importusersfromcsv(
     :returns: An object with the job information
     """
 
-    call_command(
-        "bulkimportusers",
-        filepath,
-        facility=facility,
-        userid=userid,
-        locale=locale,
-        dryrun=dryrun,
-        delete=delete,
-    )
+    try:
+        call_command(
+            "bulkimportusers",
+            filepath,
+            use_storage=True,
+            facility=facility,
+            userid=userid,
+            locale=locale,
+            dryrun=dryrun,
+            delete=delete,
+        )
+    except (CommandError, serializers.ValidationError):
+        # There was an error in the command so we need to delete the file since they
+        # need to fix and re-upload.
+        default_storage.delete(filepath)
+        raise
+
+    if not dryrun and default_storage.exists(filepath):
+        # We remove the file on a wetrun, since it is no longer needed
+        default_storage.delete(filepath)
 
 
 class ExportUsersToCSVValidator(JobValidator):
@@ -224,6 +235,7 @@ def exportuserstocsv(facility=None, locale=None):
 
     call_command(
         "bulkexportusers",
+        use_storage=True,
         facility=facility,
         locale=locale,
         overwrite="true",
@@ -574,6 +586,7 @@ class PeerImportSingleSyncJobValidator(PeerSyncJobValidator):
         )
         job_data["extra_metadata"]["user_id"] = user_id
         job_data["extra_metadata"]["username"] = user_info["username"]
+        job_data["extra_metadata"]["user_full_name"] = full_name
 
         job_data["kwargs"]["user"] = user_id
 
@@ -666,3 +679,27 @@ def cleanupsync(**kwargs):
 
     sync_filter = kwargs.pop("sync_filter")
     call_command("cleanupsyncs", sync_filter=str(sync_filter), expiration=1, **kwargs)
+
+
+@register_task(
+    job_id="cleanup_expired_deleted_users",
+    queue=facility_task_queue,
+)
+def cleanup_expired_deleted_users():
+    """
+    Delete FacilityUsers whose date_deleted is more than 30 days ago.
+    If any soft-deleted users remain, re-enqueue this task to run again in 24 hours.
+    """
+    now = timezone.now()
+    threshold = now - datetime.timedelta(days=30)
+    expired_users = FacilityUser.soft_deleted_objects.filter(
+        date_deleted__lte=threshold
+    )
+
+    expired_users.delete()
+
+    # Check if any soft-deleted users remain (regardless of date_deleted)
+    if FacilityUser.soft_deleted_objects.exists():
+        job = get_current_job()
+        # Re-enqueue to run again in 24 hours
+        job.retry_in(datetime.timedelta(days=1))

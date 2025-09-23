@@ -3,7 +3,6 @@ from datetime import timedelta
 from sys import version_info
 
 from django.conf import settings
-from django.contrib.auth import login
 from django.db.models import Exists
 from django.db.models import F
 from django.db.models import Max
@@ -13,9 +12,7 @@ from django.db.models.query import Q
 from django.http import Http404
 from django.http.response import HttpResponseBadRequest
 from django.utils import timezone
-from django.utils.decorators import method_decorator
 from django.utils.translation import get_language
-from django.views.decorators.csrf import csrf_protect
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters.rest_framework import FilterSet
 from django_filters.rest_framework import ModelChoiceFilter
@@ -23,7 +20,6 @@ from morango.constants import transfer_statuses
 from morango.models import InstanceIDModel
 from morango.models import TransferSession
 from rest_framework import mixins
-from rest_framework import status
 from rest_framework import views
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -37,12 +33,9 @@ from .models import DeviceStatus
 from .models import LearnerDeviceStatus
 from .models import StatusSentiment
 from .models import UserSyncStatus
-from .permissions import NotProvisionedCanPost
 from .permissions import UserHasAnyDevicePermissions
 from .serializers import DevicePermissionsSerializer
-from .serializers import DeviceProvisionSerializer
 from .serializers import DeviceSettingsSerializer
-from kolibri.core.analytics.tasks import schedule_ping
 from kolibri.core.api import ReadOnlyValuesViewset
 from kolibri.core.auth.api import KolibriAuthPermissions
 from kolibri.core.auth.api import KolibriAuthPermissionsFilter
@@ -94,31 +87,6 @@ class DevicePermissionsViewSet(viewsets.ModelViewSet):
     serializer_class = DevicePermissionsSerializer
     permission_classes = (KolibriAuthPermissions,)
     filter_backends = (KolibriAuthPermissionsFilter,)
-
-
-@method_decorator(csrf_protect, name="dispatch")
-class DeviceProvisionView(viewsets.GenericViewSet):
-    permission_classes = (NotProvisionedCanPost,)
-    serializer_class = DeviceProvisionSerializer
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.save()
-        if data["superuser"]:
-            login(request, data["superuser"])
-        output_serializer = self.get_serializer(data)
-        response_data = output_serializer.data
-
-        # Restart zeroconf before moving along when we're a SoUD
-        if response_data["is_soud"]:
-            logger.info("Updating our Kolibri instance on the Zeroconf network now")
-            from kolibri.utils.server import update_zeroconf_broadcast
-
-            update_zeroconf_broadcast()
-
-        schedule_ping()  # Trigger telemetry pingback after we've provisioned
-        return Response(response_data, status=status.HTTP_201_CREATED)
 
 
 class FreeSpaceView(mixins.ListModelMixin, viewsets.GenericViewSet):

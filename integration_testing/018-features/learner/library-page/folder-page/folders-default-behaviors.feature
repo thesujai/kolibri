@@ -3,7 +3,7 @@ Feature: Folders default behaviors
   Background:
     Given there is at least one channel loaded to the device
       And there are subfolders available within <channel>
-    When I go to the *Topics* page by clicking a *<channel>* within the library tab
+    When I go to the channel page by clicking on a channel card within the library tab
       And I see the folder panel on the left
       And I see content on the right
 

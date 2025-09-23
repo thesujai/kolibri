@@ -82,8 +82,8 @@ Feature: Kolibri critical workflows
 
   Scenario: Learn-only device - assigned lesson and quiz resources are automatically transferred to the LOD
   	Given I am signed in as learner on a learn-only device
-  				And there is a Kolibri server in the network
-  				And a coach has enrolled the learner to a class and assigned lesson and a quiz resources to the learner
+  		And there is a Kolibri server in the network
+  		And a coach has enrolled the learner to a class and assigned lesson and quiz resources to the learner
   	When I go to the *Home* page
   		And I click on the class name
   	Then I see all the lesson and quiz resources already downloaded on my device
@@ -93,7 +93,7 @@ Feature: Kolibri critical workflows
   	Then after a reasonable period of time the resources get automatically transferred to the learn-only device
   		And I am able to interact with and complete the resources
   	When I expand the sidebar
-  	Then I can see sync status of my device under *Device status*
+  	Then I can see the sync status of my device under *Device status*
   	When I go to *Learn > Library*
   	Then I see the *Your library* section
   		And I can see all the channels containing the resources which were assigned to me and were automatically transferred to the device
@@ -301,6 +301,91 @@ Feature: Kolibri critical workflows
   		And I see the *Clear* button for the finished task
   		And I see the *Clear completed* button
 
+  Scenario: Super admin imports content from local network or attached drive
+  	Given I am signed in to Kolibri as a super admin
+  	  And I am at *Device > Channels*
+  	  And there are other Kolibri server devices in my local network
+  	  And there is an attached drive or memory card to the device
+	  	And I am at the *Select a source* modal
+  	When I select the *Local network or internet* option
+  		And I click *Continue*
+  	Then I see the *Select device* modal
+  		And I see that the first available device is pre-selected
+  	When I click *Continue*
+  	Then I am at *Select resources to import*
+  		And I see a list of available channels
+  	When I click the *Select resources* button next to a channel
+  	Then I see the channel page with logo, name, and version of the channel
+  	  And I see the total number and size of the channel resources
+  	  And I see the list of folders for the channel
+  	  And I see that the *Import* button is disabled
+  	When I check the *Select all* checkbox
+  	Then I see the *Import* button is enabled
+  	When I click the *Import* button
+  	Then I am at the *Task manager* page
+  		And I see the *Import resources from <channel>* progress bar
+  		And I see the number and size of the resources being imported
+  		And I see the *Cancel* button
+  	When the import process concludes
+  	Then I see the task is labeled as *Finished*
+  		And I do not see the progress bar anymore
+  		And I see the *Clear* button for the finished task
+  		And I see the *Clear completed* button
+  	When I close the *Task manager* modal
+  	Then I am back at *Device > Channels*
+  	When I click the *Import* button
+  	Then I see the *Select a source* modal
+  	When I select the *Attached drive or memory card* option
+  		And I click *Continue*
+  	Then I see the *Select drive* modal
+  		And I see that the first available drive is pre-selected
+  	When I click *Continue*
+  	Then I am at *Select resources to import*
+  		And I see a list of available channels
+  	When I click the *Select resources* button next to a channel
+  	Then I see the channel page with logo, name, and version of the channel
+  	  And I see the total number and size of the channel resources
+  	  And I see the list of folders for the channel
+  	  And I see that the *Import* button is disabled
+  	When I check the *Select all* checkbox
+  	Then I see the *Import* button is enabled
+  	When I click the *Import* button
+  	Then I am at the *Task manager* page
+  		And I see the *Import resources from <channel>* progress bar
+  		And I see the number and size of the resources being imported
+  		And I see the *Cancel* button
+  	When the import process concludes
+  	Then I see the task is labeled as *Finished*
+  		And I do not see the progress bar anymore
+  		And I see the *Clear* button for the finished task
+  		And I see the *Clear completed* button
+  	When I close the *Task manager* modal
+  	Then I am back at *Device > Channels*
+  		And I see all of the imported channels
+
+  Scenario: Super admin exports content to an attached drive
+  	Given I am signed in to Kolibri as a super admin
+  	  And I am at *Device > Channels*
+  	  And there is an attached drive or memory card to the device
+  	When I click the *Options* drop-down
+  		And I select the *Export channels* option
+  	Then I see the *Export channels* modal
+  		And I see all the channels on the device
+  	When I select a channel
+  		And I click the *Export* button
+  	Then I see the *Select a drive* modal
+  		And I see that the first available drive is pre-selected
+  	When I click *Continue*
+  	Then I am at the *Task manager* page
+  		And I see the *Export <channel>* progress bar
+  		And I see the number and size of the resources being exported
+  		And I see a *Cancel* button
+  	When the export has finished
+  	Then I see the task is labeled as *Finished*
+  		And I do not see the progress bar anymore
+  		And I see the *Clear* button for the finished task
+  		And I see the *Clear completed* button
+
   Scenario: Super admin creates a learner user account
   	Given I am signed in to Kolibri as a super admin
   	  And I am at *Facility > Users*
@@ -367,41 +452,52 @@ Feature: Kolibri critical workflows
       Then I see the class page again
         And I see the selected learner user accounts listed in the *Learners* table
 
-  Scenario: Coach creates a new lesson for the entire class
+  Scenario: Coach creates a new lesson for the entire class and makes it visible to learners
   	Given I am signed in to Kolibri as a super admin or a coach
   	  	And I am at *Coach > <class> > Lessons*
+  	  	And there are imported and bookmarked resources to the device
     When I click the *New lesson* button
     Then I see the *Create new lesson* modal
     When I fill in the title for the lesson
       And I fill in the description # optional
       And I click the *Save changes* button
     Then the modal closes
-      And I see the lesson page
+      And I see the lesson details page
+      And I see a *Lesson created* snackbar message
       And I see that the *Visible to learners* toggle is switched off
       And I see that there are no resources in the lesson
-
-  Scenario: Coach adds resources to a lesson and makes it visible to learners
-  	Given I am signed in to Kolibri as a super admin or a coach
-  	  	And I am at *Coach > <class> > Lessons > <lesson>*
-  	When I click the *Manage resources* button
-  	Then I am at the *Manage resources in '<lesson>'* page
-  	  And I see the available content channels
-  	When I click on a channel
-  	Then I see the available channel resources
-  	When I select one or several resources
-  		And I click the *Save changes* button
-  	Then I am back at the lesson page
-  	  And I see the resources which I've just added to the lesson
-  	When I switch on the *Visible to learners* toggle
-  	Then I see the *Lesson is visible to learners* snackbar
+		When I click on *Manage resources* button
+    Then I see the *Manage lesson resources* side panel
+			And I see the *Select from bookmarks* label and the *Bookmarks* card below it
+			And I see the *Select from channels* card label and the channel cards for the available channels below it
+			And I see a *Search* button next to the *Select from bookmarks* label
+			And I see a *Save & finish* button at the lower right corner of the panel
+		When I click on a channel card
+		Then I see all of the available channel folders
+		When I click on a folder with resources
+		Then I can see the list with available resources
+		When I select one or several resources
+		Then I see the *N resource(s)selected (N MB)* link to the left of the *Save & finish* button
+		When I click the *Save & finish* button
+		Then I am back at the *Coach > <class> > Lesson > <lesson>* page
+			And I see a *N resource(s) added* snackbar message
+			And I can see that the selected resources are added to the table with lesson resources
+		When I click the *Visible for learners* switch for a lesson
+    Then I see the switch slide in the ON position (blue)
+      And I see the *Lesson is visible to learners* snackbar notification
+    When I click the *All lessons* link
+    Then I am back at *Coach > Lessons*
+    	And I can see that the lesson is with status set to *Visible to learners*
 
   Scenario: Coach creates a new quiz for the entire class and starts it
   	Given I am signed in to Kolibri as a super admin or a coach
-  	  	And I am at *Coach > <class> > Quizzes*
+  		And there are imported exercises on the device
+  	  And I am at *Coach > <class> > Quizzes*
     When I click the *New quiz* button
     	And I select *Create new quiz*
     Then I see the *Create new quiz* modal
     	And I see an empty *Title* field
+    	And I see the *Report visibility* drop-down with the *After learner submit quiz* option selected by default
     	And I see the *Recipients* section with the *Entire class* option selected by default
       And I see the *Section order* section with the *Fixed* option selected by default
     	And I see a *Section 1* tab with the following description text: *There are no questions in this section. To add questions, select resources from the available channels.*
@@ -409,16 +505,55 @@ Feature: Kolibri critical workflows
       And I see that both the *Save* and *Save and close* buttons are disabled
     When I fill in the title for the quiz
     	And I click the *Add questions* button
-    Then I see the *Add questions to 'Section 1'* modal
-      And I see *Current number of questions in this section: 0*
-    	And I see a search field
-      And I see *You can only select a total of 100 questions or fewer.*
-      And I see a list with the available channel resources
+    Then I see the *Questions settings for 'Section 1'* side panel
+    	And I see the *Number of questions* field with 10 set as default value
+    	And I see the unchecked checkbox *Choose questions manually*
+    	And I see an active *Continue* button at the bottom
+    When I click the *Continue* button
+    Then I see the *Add questions to 'Section 1'* side panel
+      And I see *Select up to 10 resources*
+    	And I see a *Settings* and a *Search* button next to it
+      And I see the *Select from channels* and a list with the available channels
     When I click on a channel card
       And I select an exercise with enough questions
       And I click the *Add NN questions* button
     Then I am back at the *Create new quiz* page
+    	And I see the *N questions successfully added* snackbar message
       And I see that the questions are added to *Section 1*
+    When I click the *Add section* button
+    Then I see the *Session settings* side panel
+    When I fill in all fields
+    	And I click *Add questions*
+    Then I see the *Questions settings for '<section title>'* side panel
+    	And I see the *Number of questions* field with 10 set as default value
+    	And I see the unchecked checkbox *Choose questions manually*
+    	And I see an active *Continue* button at the bottom
+    When I select the *Choose questions manually* checkbox
+    	And I click the *Continue* button
+    Then I see the *Add questions to '<section title>'* side panel
+      And I see *Select up to NN resources*
+    	And I see a *Settings* and a *Search* button next to it
+      And I see the *Select from channels* and a list with the available channels
+    When I click the *Search* button
+    Then I see the search panel
+    	And I see the *Search by keyword* field
+    	And I see the filters by *Category*, *Level*, *Language*, *Accessibility* and *Show resources*
+    When I type a keyword
+    	And I press the search icon
+    Then I see all of the available results for the entered keyword
+    When I click the *Search* button again
+    Then I am back at the search panel
+    When I apply any of the available active filters
+    Then I see all of the available results for the applied filter and previously entered keyword
+    	And I see the pills with labels of all the filters and the keyword with an *x* icon next to them
+    	And I see a *Clear all* link
+    When I click on a resource card
+    Then I see a table with all of the questions available for selection
+    When I select 1 or several questions
+    	And I click the *Add N questions* button
+    Then I am back at the *Create new quiz* page
+    	And I see the *N questions successfully added* snackbar message
+      And I see that the questions are added to the section
     When I click the *Save and close* button
     Then I am back at *Coach > Quizzes*
       And I see the *Changes saved successfully* snackbar message
@@ -487,6 +622,77 @@ Feature: Kolibri critical workflows
   		And I see a checkbox *Show correct answer*
   		And I see the number of attempts made on this question
 
+  Scenario: Coach can review a lesson report
+  	Given I am signed in to Kolibri as a coach
+      And I am at the *Coach > <class> > Lessons* page
+      And there are completed lessons
+    When I click on the title of a lesson
+    Then I see the lesson details page for a lesson
+  		And I see the lesson title, the *Manage resources* button and the *...* button next to it
+    	And I see the side panel with *Visible to learners* status (off by default), *Recipients*, *Description*, *Class*, *Size*, *Date created*
+    	And I see the *Resources* tab and *Title*, *Progress* and *Average time spent* columns for each resource
+    	And I see the *Learners* tab
+    When I click on a resource
+    Then I see the resource progress report
+    	And I see the title of the resource, class to which the resource is assigned, progress made, and average time spent
+    	And I see a *View by groups* checkbox
+    	And I see the learners table with *Name*, *Progress*, *Time spent*, *Groups* and *Last activity* columns
+      And in the *Progress* column I see the summary icons and labels (Completed, Started, Not started, and Need help)
+      And in the top right I see the *View learner devices* link, *Print report* icon, *Export as CSV* icon and a *Preview* button
+    When I go back to the lesson details page
+    	And I click on the *Learners* tab
+    Then I see a table with the learners
+    	And I see the following columns: *Name*, *Progress*, *Groups
+    	And I see the progress made by each learner
+    When I click on the name of a learner
+    Then I see a table with all of the lesson resources and the following columns: *Title*, *Progress* and *Time spent*
+    	And in the top right corner I see a *Print report* and *Export CSV* icons
+
+  Scenario: Coach can review a quiz report
+  	Given I am signed in to Kolibri as a coach
+      And I am at the *Coach > <class> > Quizzes* page
+      And there are assigned quizzes
+      And I see a table with the assigned quizzes
+      And I see the title, average score, progress, recipients, size and status of each quiz
+    When I click on the title of a quiz which is in progress
+    Then I see the title, description, recipients, average score, question order and size of the quiz
+    	And I see options to print or export the quiz
+    	And I see an *End quiz* button
+    	And I see that I am on the *Learners* tab for the quiz
+			And I see the *Name*, *Progress*, *Score*, *Groups* and *Last activity* columns for each learner
+		When I click on the name of a learner who has completed the quiz
+		Then I see the quiz report page
+			And I see the status, score, questions answered correctly, time spent and attempted times information for the quiz
+			And I see the answer history
+		When I click the back arrow
+		Then I am back at the quiz details page
+		When I click the *Difficult questions* tab
+		Then I see a table for the difficult questions with a *Question* and a *Help needed* columns
+		When I click on the title of a question
+		Then I see details for the number of attempts made on this question
+
+  Scenario: Coach can export lesson and quiz reports
+  	Given I am signed in to Kolibri as a coach
+      And I am at *Coach > <class> > Lessons* page
+      And there are completed lessons
+    When I navigate through the available pages
+    	And I click the *Export as CSV file* icon
+    Then I can download and view a lesson report as a .csv file
+    When I go to either the *Quizzes* or *Learners* *page
+    	And I click the *Export as CSV file* icon
+    Then I can download and view a report as a .csv file
+
+  Scenario: Coach can print reports
+  	Given I am signed in to Kolibri as a coach
+      And I am at *Coach > <class> > Lessons* page
+      And there are completed lessons
+    When I navigate through the available pages
+    	And I click the *Print report* icon
+    Then I can print a report
+    When I go to either the *Quizzes* or *Learners* *page
+    	And I click the *Print report* icon
+    Then I can print a report
+
   Scenario: Learner explores the *Library* while signed in
   	Given I am signed in as a learner user
   		And there is at least one channel imported on the device
@@ -498,7 +704,7 @@ Feature: Kolibri critical workflows
     When I click on the channel card of a channel from *Your library* section
     Then I am at the channel page
     	And I can see and explore all of the available resources
-    	And I can search for a resource
+    	And I can search for a resource by entering a keyword or applying a filter
     When I close the channel page
     Then I am back at *Learn > Library*
     When I click on a channel card of a channel from the *Other libraries* section
@@ -700,17 +906,17 @@ Feature: Kolibri critical workflows
 			And I am at *Device > Permissions*
 			And there is a facility user who does not have device permissions
 		When I click *Edit permissions* button for the user
-      Then I see the *Permissions* page
-      	And I can see the username, user type and facility of the user
-      When I select the *Make super admin* checkbox
-      Then I see that the checkbox under *Device permissions* is checked and disabled
-        And the *Save changes* button becomes active
-      When I click *Save changes*
-      Then I see the confirmation snackbar *Changes saved*
-      When I click on *Edit permissions* next to the user
-      Then I see that the *User type* is now *Super admin*
-        And I see the *Make Super admin* checkbox is checked but not disabled
-        And I see the *Save changes* button is disabled
+     Then I see the *Permissions* page
+      And I can see the username, user type and facility of the user
+    When I select the *Make super admin* checkbox
+    Then I see that the checkbox under *Device permissions* is checked and disabled
+      And the *Save changes* button becomes active
+    When I click *Save changes*
+    Then I see the confirmation snackbar *Changes saved*
+    When I click on *Edit permissions* next to the user
+    Then I see that the *User type* is now *Super admin*
+      And I see the *Make Super admin* checkbox is checked but not disabled
+      And I see the *Save changes* button is disabled
 
   Scenario: Super admin can see the device info and change the device name
   	Given I am signed in as a super admin
@@ -808,7 +1014,7 @@ Feature: Kolibri critical workflows
 		When the facility is done syncing
 			Then I see a message under the facility: *Last synced: just now*
 
-  Scenario: Admin can reset reset the password of a user
+  Scenario: Admin can reset the password of a user
   	Given I am signed in to Kolibri as an admin
       And I am at *Facility > Users* page
     When I click on the *Options* drop-down next to a user
@@ -818,66 +1024,3 @@ Feature: Kolibri critical workflows
       And I click the *Save* button
     Then the modal closes
       And I see the *Password reset* snackbar message
-
-  Scenario: Coach can review a lesson report
-  	Given I am signed in to Kolibri as a coach
-      And I am at the *Coach > <class> > Lessons* page
-      And there are completed lessons
-    When I click on the title of a lesson
-    Then I see the lesson summary page
-    	And I see the lesson title, the *Manage resources* button and the *...* button next to it
-    	And I see the side panel with *Visible to learners* status, *Recipients*, *Description*, *Class*, *Size*, *Date created*
-    	And I see the *Resources* tab with a table with the available lesson resources and and *Title*, *Progress* and *Average time spent* columns for each resource
-    	And I see options to rearrange the order of the resources or to remove a resource
-    	And I see the *Learners* tab
-    When I click on the *Learners* tab
-    Then I see a table with the learners
-    	And I see the following columns: *Name*, *Progress*, *Groups
-    	And I see the progress made by each learner
-    When I click the *Export as CSV* button
-    	Then I can download and open the generated .csv report
-
-  Scenario: Coach can review a quiz report
-  	Given I am signed in to Kolibri as a coach
-      And I am at the *Coach > <class> > Quizzes* page
-      And there are assigned quizzes
-      And I see a table with the assigned quizzes
-      And I see the title, average score, progress, recipients, size and status of each quiz
-    When I click on the title of a quiz which is in progress
-    Then I see the title, description, recipients, average score, question order and size of the quiz
-    	And I see options to print or export the quiz
-    	And I see an *End quiz* button
-    	And I see that I am on the *Reports* tab for the quiz
-			And I see the *Name*, *Progress*, *Score*, *Groups* and *Last activity* columns for each learner
-		When I click on the name of a learner who has completed the quiz
-		Then I see the quiz report page
-			And I see the status, score, questions answered correctly, time spent and attempted times information for the quiz
-			And I see the answer history
-		When I click the back arrow
-		Then I am back at the previous page
-		When I click the *Difficult questions* tab
-		Then I see a table for the difficult questions with a *Question* and a *Help needed* columns
-		When I click on the title of a question
-		Then I see details for the number of attempts made on this question
-
-  Scenario: Coach can export lesson and quiz reports
-  	Given I am signed in to Kolibri as a coach
-      And I am at *Coach > <class> > Lessons* page
-      And there are completed lessons
-    When I navigate through the available pages
-    	And I click the *Export as CSV file* icon
-    Then I can download and view a lesson report as a .csv file
-    When I go to either the *Quizzes* or *Learners* *page
-    	And I click the *Export as CSV file* icon
-    Then I can download and view a report as a .csv file
-
-  Scenario: Coach can print reports
-  	Given I am signed in to Kolibri as a coach
-      And I am at *Coach > <class> > Lessons* page
-      And there are completed lessons
-    When I navigate through the available pages
-    	And I click the *Print report* icon
-    Then I can print a report
-    When I go to either the *Quizzes* or *Learners* *page
-    	And I click the *Print report* icon
-    Then I can print a report

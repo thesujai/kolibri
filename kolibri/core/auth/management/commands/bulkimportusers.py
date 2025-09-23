@@ -1,6 +1,7 @@
 import csv
 import logging
 import ntpath
+import os
 import re
 from uuid import UUID
 
@@ -274,7 +275,7 @@ class Validator(object):
         lowercase_username = username.lower()
 
         # Check if a user with the provided username exists (case-insensitive)
-        existing_user = FacilityUser.objects.filter(
+        existing_user = FacilityUser.all_objects.filter(
             username__iexact=lowercase_username, facility=self.facility
         ).first()
         # Convert existing keys in self.users to lowercase
@@ -367,6 +368,14 @@ class Command(AsyncCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "filepath", action="store", type=str, help="Path to CSV file."
+        )
+        parser.add_argument(
+            "-s",
+            "--use-django-storage",
+            action="store_true",
+            dest="use_storage",
+            default=False,
+            help="The generated file will be read/written using Django FileStorage",
         )
         parser.add_argument(
             "--facility",
@@ -482,9 +491,10 @@ class Command(AsyncCommand):
         translation.activate(self.locale)
         self.overall_error.append(str(msg))
 
-    def csv_headers_validation(self, filepath):
-        csv_file = open_csv_for_reading(filepath)
-        with csv_file as f:
+    def csv_headers_validation(self, local_filepath=None, storage_filepath=None):
+        with open_csv_for_reading(
+            local_filepath=local_filepath, storage_filepath=storage_filepath
+        ) as f:
             header = next(csv.reader(f, strict=True))
             has_header = False
             self.header_translation = {
@@ -557,7 +567,7 @@ class Command(AsyncCommand):
             if u[self.header_translation["UUID"]] != ""
         ]
         existing_users = (
-            FacilityUser.objects.filter(facility=self.default_facility)
+            FacilityUser.all_objects.filter(facility=self.default_facility)
             .filter(id__in=users_uuid)
             .values_list("id", flat=True)
         )
@@ -569,13 +579,16 @@ class Command(AsyncCommand):
             user_row = users[user]
             values = self.get_field_values(user_row)
             if values["uuid"] in existing_users:
-                user_obj = FacilityUser.objects.get(
+                user_obj = FacilityUser.all_objects.get(
                     id=values["uuid"], facility=self.default_facility
                 )
+                # If user was soft-deleted, un-delete them
+                if user_obj.date_deleted is not None:
+                    user_obj.date_deleted = None
                 keeping_users.append(user_obj)
                 if user_obj.username != user:
                     # check for duplicated username in the facility
-                    existing_user = FacilityUser.objects.get(
+                    existing_user = FacilityUser.all_objects.get(
                         username__iexact=user, facility=self.default_facility
                     )
                     if existing_user:
@@ -593,7 +606,7 @@ class Command(AsyncCommand):
             else:
                 # If UUID is not specified, check for a username clash
                 if values["uuid"] == "":
-                    existing_user = FacilityUser.objects.filter(
+                    existing_user = FacilityUser.all_objects.filter(
                         username__iexact=user, facility=self.default_facility
                     ).first()
                     if existing_user:
@@ -713,9 +726,11 @@ class Command(AsyncCommand):
 
         return default_facility
 
-    def get_number_lines(self, filepath):
+    def get_number_lines(self, local_filepath=None, storage_filepath=None):
         try:
-            with open_csv_for_reading(filepath) as f:
+            with open_csv_for_reading(
+                local_filepath=local_filepath, storage_filepath=storage_filepath
+            ) as f:
                 number_lines = len(f.readlines())
         except (ValueError, FileNotFoundError, csv.Error) as e:
             number_lines = None
@@ -730,7 +745,7 @@ class Command(AsyncCommand):
         users_not_to_delete += admins.values_list("id", flat=True)
         if options["userid"]:
             users_not_to_delete.append(options["userid"])
-        users_to_delete = FacilityUser.objects.filter(
+        users_to_delete = FacilityUser.all_objects.filter(
             facility=self.default_facility
         ).exclude(id__in=users_not_to_delete)
         # Classes not included in the csv will be cleared of users,
@@ -755,7 +770,7 @@ class Command(AsyncCommand):
     def get_user(self, username, users):
         user = users.get(username, None)
         if not user:  # the user has not been created nor updated:
-            user = FacilityUser.objects.get(
+            user = FacilityUser.all_objects.get(
                 username=username, facility=self.default_facility
             )
         return user
@@ -852,6 +867,21 @@ class Command(AsyncCommand):
                     errorlines.write("\n")
 
     def handle_async(self, *args, **options):
+
+        self.default_facility = self.get_facility(options)
+
+        storage_filepath = None
+        local_filepath = None
+
+        use_storage = options["use_storage"]
+
+        if use_storage:
+            storage_filepath = options["filepath"]
+            filepath = storage_filepath
+        else:
+            local_filepath = os.path.join(os.getcwd(), options["filepath"])
+            filepath = local_filepath
+
         # initialize stats data structures:
         self.overall_error = []
         db_new_classes = []
@@ -870,20 +900,24 @@ class Command(AsyncCommand):
 
         self.job = get_current_job()
         filepath = options["filepath"]
-        self.default_facility = self.get_facility(options)
-        self.number_lines = self.get_number_lines(filepath)
+        self.number_lines = self.get_number_lines(
+            storage_filepath=storage_filepath, local_filepath=local_filepath
+        )
         self.exit_if_error()
 
         with self.start_progress(total=100) as self.progress_update:
             # validate csv headers:
-            has_header = self.csv_headers_validation(filepath)
+            has_header = self.csv_headers_validation(
+                local_filepath=local_filepath, storage_filepath=storage_filepath
+            )
             if not has_header:
                 self.append_error(MESSAGES[INVALID_HEADER])
             self.exit_if_error()
             self.progress_update(1)  # state=csv_headers
             try:
-                csv_file = open_csv_for_reading(filepath)
-                with csv_file as f:
+                with open_csv_for_reading(
+                    local_filepath=local_filepath, storage_filepath=storage_filepath
+                ) as f:
                     reader = csv.DictReader(f, strict=True)
                     per_line_errors, classes, users, roles = self.csv_values_validation(
                         reader, self.header_translation, self.default_facility

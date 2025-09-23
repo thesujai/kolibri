@@ -1,8 +1,8 @@
-import ContentRendererModule from 'kolibri-viewer';
+import ContentViewerModule from 'kolibri-viewer';
 import SlideshowRendererComponent from './views/SlideshowRendererComponent';
 
-class SlideshowModule extends ContentRendererModule {
-  get rendererComponent() {
+class SlideshowModule extends ContentViewerModule {
+  get viewerComponent() {
     SlideshowRendererComponent.contentModule = this;
     return SlideshowRendererComponent;
   }

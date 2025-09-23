@@ -84,9 +84,6 @@
         :hideStatus="true"
         :isSurvey="isSurvey"
       />
-      <div v-if="!answerState">
-        {{ coreString('quizNotStartedText') }}
-      </div>
     </template>
 
     <template
@@ -162,15 +159,14 @@
               v-if="!showCorrectAnswer"
               :interactions="currentInteractionHistory"
               :selectedInteractionIndex="selectedInteractionIndex"
+              :reverse="reverseInteractions"
               @select="navigateToQuestionAttempt"
             />
           </div>
-          <ContentRenderer
+          <ContentViewer
             :itemId="renderableItemId"
             :allowHints="false"
-            :kind="exercise.kind"
             :files="exercise.files"
-            :available="exercise.available"
             :extraFields="exercise.extra_fields"
             :interactive="false"
             :assessment="true"
@@ -205,7 +201,7 @@
   import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
   import useKResponsiveWindow from 'kolibri-design-system/lib/composables/useKResponsiveWindow';
   import MasteryLogResource from 'kolibri-common/apiResources/MasteryLogResource';
-  import { now } from 'kolibri/utils/serverClock';
+  import useNow from 'kolibri/composables/useNow';
   import { annotateSections } from 'kolibri-common/quizzes/utils';
   import MissingResourceAlert from 'kolibri-common/components/MissingResourceAlert';
   import { displaySectionTitle } from 'kolibri-common/strings/enhancedQuizManagementStrings';
@@ -230,8 +226,10 @@
     mixins: [commonCoreStrings],
     setup() {
       const { windowIsSmall } = useKResponsiveWindow();
+      const { now } = useNow();
       return {
         windowIsSmall,
+        now,
       };
     },
     props: {
@@ -357,7 +355,6 @@
     data() {
       return {
         showCorrectAnswer: false,
-        now: now(),
         pastTries: [],
         currentTry: null,
         loading: true,
@@ -435,7 +432,7 @@
           : this.attemptLogs[this.questionNumber].item;
       },
       renderableItemId() {
-        // This item value is used to pass into ContentRenderer to set the correct question,
+        // This item value is used to pass into ContentViewer to set the correct question,
         // so reclaim the actual item id value here by splitting on ':'.
         // This is only needed in cases where the item id has been artificially generated for coach
         // assigned quizzes.
@@ -451,11 +448,17 @@
           ) || []
           : [];
       },
+      reverseInteractions() {
+        return this.isQuiz || this.isSurvey;
+      },
       currentInteraction() {
-        return (
-          this.currentInteractionHistory &&
-          this.currentInteractionHistory[this.selectedInteractionIndex]
-        );
+        if (!this.currentInteractionHistory) {
+          return null;
+        }
+        const history = this.reverseInteractions
+          ? this.currentInteractionHistory.toReversed()
+          : this.currentInteractionHistory;
+        return history[this.selectedInteractionIndex];
       },
       titleIcon() {
         if (this.isSurvey) {

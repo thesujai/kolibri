@@ -6,7 +6,7 @@
     :style="backdropStyle"
   >
     <div
-      class="renderer"
+      class="viewer"
       :style="bodyStyle"
     >
       <nav>
@@ -113,7 +113,7 @@
     z-index: 4;
   }
 
-  .renderer {
+  .viewer {
     z-index: inherit;
     width: 80%;
     max-height: calc(100vh - 80px);
@@ -123,13 +123,13 @@
   }
 
   @media (max-width: 960px) {
-    .renderer {
+    .viewer {
       width: 90%;
     }
   }
 
   @media (max-width: 600px) {
-    .renderer {
+    .viewer {
       width: 100%;
       height: 100vh;
       max-height: 100vh;

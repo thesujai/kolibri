@@ -13,6 +13,17 @@ import BookmarkPage from '../views/BookmarkPage.vue';
 import ExploreLibrariesPage from '../views/ExploreLibrariesPage';
 import classesRoutes from './classesRoutes';
 
+// Conditionally import QTI sandbox routes in non-production
+let qtiSandboxRoutes = [];
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    const { sandboxRoutes } = require('../../../../qti_viewer/assets/src/sandbox');
+    qtiSandboxRoutes = sandboxRoutes;
+  } catch (e) {
+    // QTI viewer plugin may not be available
+  }
+}
+
 const { channelsMap, fetchChannels } = useChannels();
 const { isUserLoggedIn } = useUser();
 
@@ -173,6 +184,8 @@ export default [
       next();
     },
   },
+  // Add QTI sandbox routes in non-production
+  ...qtiSandboxRoutes,
   {
     path: '*',
     redirect: '/',

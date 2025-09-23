@@ -2,14 +2,12 @@
 
   <div>
     <template v-if="sessionReady">
-      <ContentRenderer
+      <ContentViewer
         v-if="!content.assessmentmetadata"
-        class="content-renderer"
-        :kind="content.kind"
+        class="content-viewer"
         :lang="content.lang"
         :files="content.files"
         :options="content.options"
-        :available="content.available"
         :duration="content.duration"
         :extraFields="extra_fields"
         :progress="progress"
@@ -27,7 +25,7 @@
       />
       <QuizRenderer
         v-else-if="practiceQuiz || survey"
-        class="content-renderer"
+        class="content-viewer"
         :style="{ paddingBottom: windowIsSmall ? '80px' : '0px' }"
         :content="content"
         :extraFields="extra_fields"
@@ -51,14 +49,12 @@
       />
       <AssessmentWrapper
         v-else
-        class="content-renderer"
-        :kind="content.kind"
+        class="content-viewer"
         :files="content.files"
         :lang="content.lang"
         :randomize="content.assessmentmetadata.randomize"
         :masteryModel="content.assessmentmetadata.mastery_model"
         :assessmentIds="content.assessmentmetadata.assessment_item_ids"
-        :available="content.available"
         :extraFields="extra_fields"
         :progress="progress"
         :userId="currentUserId"
@@ -374,12 +370,32 @@
           node: this.content,
           lessonId: this.lessonId,
           repeat,
-        }).then(() => {
-          this.sessionReady = true;
-          this.wasComplete = this.progress >= 1;
-          // Set progress into the content node progress store in case it was not already loaded
-          this.cacheProgress();
-        });
+        })
+          .then(() => {
+            this.sessionReady = true;
+            this.wasComplete = this.progress >= 1;
+            // Set progress into the content node progress store in case it was not already loaded
+            this.cacheProgress();
+          })
+          .catch(error => {
+            if (
+              error.response &&
+              error.response.status === 400 &&
+              error.response.data &&
+              error.response.data.includes('Invalid lesson_id')
+            ) {
+              this.$router.replace({ ...this.$route, query: null });
+              return this.initContentSession({
+                node: this.content,
+                repeat,
+              }).then(() => {
+                this.sessionReady = true;
+                this.wasComplete = this.progress >= 1;
+                this.cacheProgress();
+              });
+            }
+            throw error;
+          });
       },
       repeat() {
         this.stopTracking().then(() => {
@@ -399,9 +415,9 @@
 
 <style lang="scss" scoped>
 
-  .content-renderer {
+  .content-viewer {
     // 61 pixels is the height of the Learning Activity Bar + 5px.
-    // This seems to be the largest height that the content renderer can be
+    // This seems to be the largest height that the content viewer can be
     // without causing the page to scroll.
     height: calc(100vh - 61px);
   }

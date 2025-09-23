@@ -58,6 +58,10 @@ export const coreStrings = createTranslator('CommonCoreStrings', {
     context:
       'Used to delete an element from Kolibri.\n\nFor example, an admin can delete a user from a facility if they are no longer a user there.',
   },
+  dismissAction: {
+    message: 'Dismiss',
+    context: 'Button label to dismiss a notification',
+  },
   editAction: {
     message: 'Edit',
     context:
@@ -131,9 +135,14 @@ export const coreStrings = createTranslator('CommonCoreStrings', {
       'When a user edits an entity en Kolibri that changes some piece of information about it, they need to save those changes.',
   },
   saveAndFinishAction: {
-    message: 'Save & Finish',
+    message: 'Save & finish',
     context:
       'When a user edits an entity in Kolibri and no more changes are needed so we close the given view after that.',
+  },
+  saveAndClose: {
+    message: 'Save and close',
+    context:
+      'When a user edits an entity in a dialog/side panel and no more changes are needed so we close the dialog after that.',
   },
   selectAllOnPageAction: {
     message: 'Select all on page',
@@ -188,9 +197,17 @@ export const coreStrings = createTranslator('CommonCoreStrings', {
     context:
       "An action that removes a resource or topic from a user's bookmarks. The opposite of 'Save to bookmarks'.",
   },
+  removedFromBookmarks: {
+    message: 'Removed from bookmarks',
+    context: 'A message indicating that a user has removed a resource from bookmarks',
+  },
   saveToBookmarks: {
     message: 'Save to bookmarks',
     context: "An action that adds a resource or topic to a user's bookmarks",
+  },
+  savedToBookmarks: {
+    message: 'Saved to bookmarks',
+    context: 'A message indicating that a user has saved a resource to bookmarks',
   },
   zoomIn: {
     message: 'Zoom in',
@@ -206,6 +223,11 @@ export const coreStrings = createTranslator('CommonCoreStrings', {
     message: 'Admin',
     context:
       'Refers to a user with an admin role. This role is marked with a label in a list of users.',
+  },
+  classLabel: {
+    message: 'Class',
+    context:
+      'A class is a group of enrolled learners and assigned coaches, created and managed by an admin.\n\nCoaches can assign lessons and quizzes to the learners in a class, and view reports of their progress and performance.',
   },
   allClassesLabel: {
     message: 'All classes',
@@ -275,6 +297,14 @@ export const coreStrings = createTranslator('CommonCoreStrings', {
     message: 'Coaches',
     context:
       "In a list of classes, users can see which coaches manage which specific classes in the 'Coaches' column.",
+  },
+  adminsLabel: {
+    message: 'Admins',
+    context: 'Admins are users with a specific role in Kolibri with special permissions.',
+  },
+  superAdminsLabel: {
+    message: 'Super admins',
+    context: 'Super admins are users with a specific role in Kolibri with special permissions.',
   },
   completedLabel: {
     message: 'Completed',
@@ -565,9 +595,15 @@ export const coreStrings = createTranslator('CommonCoreStrings', {
     message: 'Important: please remember this account information. Write it down if needed.',
     context: 'Helper/information text to remind user to take note of their account information.',
   },
-  quizNotStartedText: {
-    message: 'Quiz not started',
-    context: 'Message displayed to indicate that a quiz has not been started by a learner.',
+  sideNavLabel: {
+    message: 'Side navigation',
+    context:
+      'Refers to the sidebar menu in Kolibri that allows switching between main app sections like Learn, Coach, Facility, Device.',
+  },
+  contentActionsLabel: {
+    message: 'Content actions',
+    context:
+      'Refers to the set of actions that can be performed on a resource, such as bookmarking, downloading, etc.',
   },
 
   // Learning Activities
@@ -1068,11 +1104,6 @@ export const coreStrings = createTranslator('CommonCoreStrings', {
     message: 'Select from bookmarks',
     context: "Option on the 'Manage lesson resources' page.",
   },
-  savedFromBookmarks: {
-    message: 'Saved from bookmarks',
-    context:
-      'Notification message after user clicked the bookmark icon button, indicating the resource has been  saved.',
-  },
   numberOfBookmarks: {
     message: '{ count, number } { count, plural, one { bookmark } other { bookmarks }}',
   },
@@ -1565,6 +1596,46 @@ export const coreStrings = createTranslator('CommonCoreStrings', {
     message: 'Your library',
     context: '',
   },
+
+  // Are you sure you want to leave confirmation
+  closeConfirmationTitle: {
+    message: 'Are you sure you want to leave this page?',
+    context:
+      'The title of a confirmation modal informing the user that they will lose their work if they leave the page',
+  },
+  closeConfirmationMessage: {
+    message: 'You will lose any unsaved edits to your work',
+    context:
+      'Warning message for the user that they will lose their work if they leave the page without saving.',
+  },
+
+  // aria and a11y related strings
+  moveUpLabel: {
+    message: 'Move up',
+    context: 'Label for the button that moves a resource up in the list. Not visible in the UI.',
+  },
+  moveDownLabel: {
+    message: 'Move down',
+    context: 'Label for the button that moves a resource down in the list. Not visible in the UI.',
+  },
+  clickableOptionsDescription: {
+    message: 'Options are clickable',
+    context:
+      'Visually hidden description for screen readers to indicate that the options in a list are clickable.',
+  },
+  deselectedLabel: {
+    message: 'Deselected',
+    context: 'Label for the deselected state of a checkbox. Not visible in the UI.',
+  },
+  allNOptionsSelectedLabel: {
+    message: 'All {count, number} {count, plural, one {option} other {options}} selected',
+    context: 'Label for the selected state of a checkbox. Not visible in the UI.',
+  },
+  noOptionsSelectedLabel: {
+    message: 'No options selected',
+    context:
+      'Label for the state of a checkbox when no options are selected. Not visible in the UI.',
+  },
 });
 
 /**
@@ -1586,6 +1657,7 @@ const nonconformingKeys = {
   OTHER_SUPPLIES: 'needsMaterials',
   FOR_BEGINNERS: 'forBeginners',
   BASIC_SKILLS: 'allLevelsBasicSkills',
+  PROFESSIONAL: 'specializedProfessionalTraining',
   FOUNDATIONS: 'basicSkills',
   foundations: 'basicSkills',
   foundationsLogicAndCriticalThinking: 'logicAndCriticalThinking',

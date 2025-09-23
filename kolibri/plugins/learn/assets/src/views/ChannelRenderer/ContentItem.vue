@@ -2,16 +2,16 @@
 
   <div>
     <template v-if="sessionReady">
-      <ContentRenderer
+      <ContentViewer
         v-if="!assessment"
-        class="content-renderer"
+        class="content-viewer"
         v-bind="contentProps"
         v-on="contentHandlers"
       />
 
       <AssessmentWrapper
         v-else
-        class="content-renderer"
+        class="content-viewer"
         v-bind="exerciseProps"
         v-on="contentHandlers"
       />
@@ -186,7 +186,7 @@
 
 <style lang="scss" scoped>
 
-  .content-renderer {
+  .content-viewer {
     // Needs to be one less than the ScrollingHeader's z-index of 4
     z-index: 3;
   }

@@ -1,8 +1,8 @@
-import ContentRendererModule from 'kolibri-viewer';
+import ContentViewerModule from 'kolibri-viewer';
 import PDFComponent from './views/PdfRendererIndex';
 
-class DocumentPDFModule extends ContentRendererModule {
-  get rendererComponent() {
+class DocumentPDFModule extends ContentViewerModule {
+  get viewerComponent() {
     return PDFComponent;
   }
 }

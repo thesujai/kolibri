@@ -1,8 +1,8 @@
-import ContentRendererModule from 'kolibri-viewer';
+import ContentViewerModule from 'kolibri-viewer';
 import ExerciseComponent from './views/PerseusRendererIndex';
 
-class ExercisePerseusModule extends ContentRendererModule {
-  get rendererComponent() {
+class ExercisePerseusModule extends ContentViewerModule {
+  get viewerComponent() {
     ExerciseComponent.contentModule = this;
     return ExerciseComponent;
   }

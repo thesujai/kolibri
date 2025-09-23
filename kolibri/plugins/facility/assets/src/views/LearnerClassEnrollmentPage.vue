@@ -67,6 +67,10 @@
       ...mapActions('classAssignMembers', ['enrollLearnersInClass']),
       enrollLearners(selectedUsers) {
         this.formIsDisabled = true;
+        const welcomeDismissalKey = 'DEVICE_WELCOME_MODAL_DISMISSED';
+        selectedUsers.forEach(id => {
+          window.localStorage.setItem(`${welcomeDismissalKey}-${id}`, false);
+        });
         this.enrollLearnersInClass({ classId: this.class.id, users: selectedUsers })
           .then(() => {
             this.$router

@@ -1,8 +1,8 @@
 import mock from 'xhr-mock';
 import coreStore from 'kolibri/store';
 import redirectBrowser from 'kolibri/utils/redirectBrowser';
-import * as serverClock from 'kolibri/utils/serverClock';
 import { get, set } from '@vueuse/core';
+import useUser, { useUserMock } from 'kolibri/composables/useUser'; // eslint-disable-line
 import useSnackbar, { useSnackbarMock } from 'kolibri/composables/useSnackbar'; // eslint-disable-line
 import { ref } from 'vue';
 import { DisconnectionErrorCodes } from 'kolibri/constants';
@@ -15,13 +15,26 @@ jest.mock('kolibri/utils/redirectBrowser');
 jest.mock('kolibri/urls');
 jest.mock('lockr');
 jest.mock('kolibri/composables/useSnackbar');
+jest.mock('kolibri/composables/useUser');
 
 coreStore.registerModule('core', coreModule);
+
+let mockSetSession;
 
 describe('HeartBeat', function () {
   stubWindowLocation(beforeAll, afterAll);
   // replace the real XHR object with the mock XHR object before each test
-  beforeEach(() => mock.setup());
+  beforeEach(() => {
+    mock.setup();
+    mockSetSession = jest.fn();
+    useUser.mockImplementation(() =>
+      useUserMock({
+        sessionId: 'test_id',
+        currentUserId: 'test_user_id',
+        setSession: mockSetSession,
+      }),
+    );
+  });
 
   // put the real XHR object back and clear the mocks after each test
   afterEach(() => mock.teardown());
@@ -206,7 +219,13 @@ describe('HeartBeat', function () {
       jest.spyOn(heartBeat, '_sessionUrl').mockReturnValue('url');
     });
     it('should sign out if an auto logout is detected', function () {
-      coreStore.commit('CORE_SET_SESSION', { user_id: 'test', id: 'current' });
+      useUser.mockImplementation(() =>
+        useUserMock({
+          sessionId: 'test',
+          currentUserId: 'current',
+          setSession: mockSetSession,
+        }),
+      );
       mock.put(/.*/, {
         status: 200,
         body: JSON.stringify({ user_id: null, id: 'current' }),
@@ -218,7 +237,13 @@ describe('HeartBeat', function () {
       });
     });
     it('should redirect if a change in user is detected', function () {
-      coreStore.commit('CORE_SET_SESSION', { user_id: 'test', id: 'current' });
+      useUser.mockImplementation(() =>
+        useUserMock({
+          sessionId: 'test',
+          currentUserId: 'current',
+          setSession: mockSetSession,
+        }),
+      );
       redirectBrowser.mockReset();
       mock.put(/.*/, {
         status: 200,
@@ -230,7 +255,13 @@ describe('HeartBeat', function () {
       });
     });
     it('should not sign out if user_id changes but session is being set for first time', function () {
-      coreStore.commit('CORE_SET_SESSION', { user_id: undefined, id: undefined });
+      useUser.mockImplementation(() =>
+        useUserMock({
+          sessionId: undefined,
+          currentUserId: undefined,
+          setSession: mockSetSession,
+        }),
+      );
       mock.put(/.*/, {
         status: 200,
         body: JSON.stringify({ user_id: null, id: 'current' }),
@@ -241,21 +272,29 @@ describe('HeartBeat', function () {
         expect(stub).toHaveBeenCalledTimes(0);
       });
     });
-    it('should call setServerTime with a clientNow value that is between the start and finish of the poll', function () {
-      coreStore.commit('CORE_SET_SESSION', { user_id: 'test', id: 'current' });
+    it('should call setSession with a clientNow value that is between the start and finish of the poll', function () {
+      useUser.mockImplementation(() =>
+        useUserMock({
+          sessionId: 'test',
+          currentUserId: 'current',
+          setSession: mockSetSession,
+        }),
+      );
       const serverTime = new Date().toJSON();
       mock.put(/.*/, {
         status: 200,
         body: JSON.stringify({ user_id: 'test', id: 'current', server_time: serverTime }),
         headers: { 'Content-Type': 'application/json' },
       });
-      const stub = jest.spyOn(serverClock, 'setServerTime');
       const start = new Date();
       return heartBeat._checkSession().finally(() => {
         const end = new Date();
-        expect(stub.mock.calls[0][0]).toEqual(serverTime);
-        expect(stub.mock.calls[0][1].getTime()).toBeGreaterThanOrEqual(start.getTime());
-        expect(stub.mock.calls[0][1].getTime()).toBeLessThan(end.getTime());
+        expect(mockSetSession).toHaveBeenCalledTimes(1);
+        expect(mockSetSession.mock.calls[0][0]['session']['server_time']).toEqual(serverTime);
+        expect(mockSetSession.mock.calls[0][0]['clientNow'].getTime()).toBeGreaterThanOrEqual(
+          start.getTime(),
+        );
+        expect(mockSetSession.mock.calls[0][0]['clientNow'].getTime()).toBeLessThan(end.getTime());
       });
     });
     describe('when is connected', function () {

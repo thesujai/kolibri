@@ -1,9 +1,11 @@
 <template>
 
   <AppBarPage :title="title">
-    <div style="max-width: 1000px; margin: 0 auto">
-      <slot></slot>
-    </div>
+    <template #default="{ pageContentHeight }">
+      <div style="max-width: 1000px; margin: 0 auto">
+        <slot :pageContentHeight="pageContentHeight"></slot>
+      </div>
+    </template>
   </AppBarPage>
 
 </template>

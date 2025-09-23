@@ -10,7 +10,7 @@ Feature: Coaches can see sync statuses for connected devices
 
 	Scenario: Coach can see the sync statuses of the learners from the *Class home* page
 		When I go to *Coach > <class> Class home*
-			And I click the *View learners* hyperlink
+			And I click the *View learner devices* hyperlink
 		Then I see the *Learners in '<class>'* table with all devices connected to the classroom server
 			And I see the sync statuses of every connected device
 
@@ -23,4 +23,4 @@ Feature: Coaches can see sync statuses for connected devices
 	Scenario: Coaches can see more information regarding sync statuses
 		Given I am at the *Learners in '<class>'* page
 		When I click the *Information about sync statuses* hyperlink
-		Then I see a modal giving me information on each individual sync status
+		Then I see a modal giving me information on each individual sync status such as *Synced*, *Syncing*, *Waiting to sync*, *Not recently synced or unable to sync*, *Not enough storage*, *Not connected to server*

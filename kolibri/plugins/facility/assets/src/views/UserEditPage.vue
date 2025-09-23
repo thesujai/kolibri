@@ -154,7 +154,7 @@
   import useUser from 'kolibri/composables/useUser';
   import useSnackbar from 'kolibri/composables/useSnackbar';
   import useFacilities from 'kolibri-common/composables/useFacilities';
-  import IdentifierTextbox from './IdentifierTextbox';
+  import IdentifierTextbox from './users/sidePanels/UserCreate/IdentifierTextbox.vue';
 
   export default {
     name: 'UserEditPage',
@@ -176,10 +176,11 @@
     mixins: [commonCoreStrings],
     setup() {
       const { createSnackbar } = useSnackbar();
-      const { currentUserId } = useUser();
+      const { currentUserId, logout } = useUser();
       const { getFacilityConfig, facilityConfig } = useFacilities();
 
       return {
+        logout,
         createSnackbar,
         currentUserId,
         getFacilityConfig,
@@ -377,7 +378,7 @@
         // newUserKind is falsey if Super Admin, since that's not a facility role
         if (this.willBeLoggedOut) {
           // Log out of Facility Page if and Admin demotes themselves to non-Admin
-          this.$store.dispatch('kolibriLogout');
+          this.logout();
         } else {
           this.createSnackbar(this.coreString('changesSavedNotification'));
           this.goToUserManagementPage();

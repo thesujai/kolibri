@@ -3,9 +3,8 @@ Feature: Admin syncs facility
 
   Background:
     Given I am signed in as a Facility admin
-      And my facility has been registered before
-      And I want to sync my facility data to Kolibri Data Portal
-      And I am at *Facility > Data*
+    	And I am at *Facility > Data*
+      And my facility is already registered
       And there are other devices with Kolibri on the network
 
   Scenario: Learn what sync does
@@ -13,7 +12,7 @@ Feature: Admin syncs facility
     Then I see the *Kolibri data portal* modal with a description of what syncing does
     When I click the *Close* button
     Then the modal closes
-    	And I am at *Facility > Data*
+    	And I am back at *Facility > Data*
 
   Scenario: Successful sync to KDP
     When I click the *Sync* button

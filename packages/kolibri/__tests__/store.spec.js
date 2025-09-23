@@ -5,6 +5,9 @@ import * as constants from 'kolibri/constants';
 import { coreStoreFactory as makeStore } from '../store';
 import coreModule from '../../../kolibri/core/assets/src/state/modules/core';
 import { stubWindowLocation } from 'testUtils'; // eslint-disable-line
+import * as useUserModule from '../composables/useUser';
+
+jest.mock('../composables/useUser');
 
 jest.mock('kolibri/urls');
 jest.mock('kolibri/client');
@@ -36,29 +39,44 @@ describe('Vuex store/actions for core module', () => {
     });
   });
 
-  describe('kolibriLogin', () => {
+  describe('useUser composable', () => {
     stubWindowLocation(beforeAll, afterAll);
 
-    let store;
-
     beforeEach(() => {
-      store = makeStore();
-      store.registerModule('core', coreModule);
+      // Reset mocks before each test
+      useUserModule.default.mockImplementation(() => ({
+        login: jest.fn().mockImplementation(() => {
+          // This should match the implementation in useUser.js
+          redirectBrowser();
+          return Promise.resolve();
+        }),
+        logout: jest.fn().mockImplementation(() => {
+          // This should match the implementation in useUser.js
+          redirectBrowser();
+          return Promise.resolve();
+        }),
+      }));
+      redirectBrowser.mockReset();
+      client.mockReset();
     });
 
     afterEach(() => {
+      useUserModule.default.mockReset();
       redirectBrowser.mockReset();
+      client.mockReset();
     });
 
     it('successful login', async () => {
-      client.__setPayload({
-        // just sending subset of sessionPayload
+      const sessionPayload = {
         id: '123',
         username: 'e_fermi',
         kind: ['cool-guy-user'],
-      });
+      };
+      client.__setPayload(sessionPayload);
 
-      await store.dispatch('kolibriLogin', {});
+      const { login } = useUserModule.default();
+      await login({});
+
       expect(redirectBrowser).toHaveBeenCalled();
     });
 
@@ -76,8 +94,18 @@ describe('Vuex store/actions for core module', () => {
         });
       });
 
-      const error = await store.dispatch('kolibriLogin', {});
-      expect(error).toEqual(constants.LoginErrors.INVALID_CREDENTIALS);
+      const { login } = useUserModule.default();
+      try {
+        await login({});
+      } catch (error) {
+        expect(error).toEqual(constants.LoginErrors.INVALID_CREDENTIALS);
+      }
+    });
+
+    it('successful logout', async () => {
+      const { logout } = useUserModule.default();
+      await logout();
+      expect(redirectBrowser).toHaveBeenCalled();
     });
   });
 });

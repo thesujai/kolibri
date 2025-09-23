@@ -3,7 +3,7 @@
   <div class="interaction-list">
     <div class="attempt-container">
       <InteractionItem
-        v-for="(interaction, index) in interactions"
+        v-for="(interaction, index) in reverse ? interactions.toReversed() : interactions"
         :key="index"
         :selected="isSelected(index)"
         :interaction="interaction"
@@ -35,6 +35,10 @@
         type: Number,
         required: true,
       },
+      reverse: {
+        type: Boolean,
+        default: false,
+      },
     },
     computed: {
       interactionsMessage() {
@@ -43,7 +47,10 @@
           return this.$tr('noInteractions');
         }
         if (numAttempts > 1) {
-          return this.$tr('currAnswer', { value: this.selectedInteractionIndex + 1 });
+          const value = this.reverse
+            ? numAttempts - this.selectedInteractionIndex
+            : this.selectedInteractionIndex + 1;
+          return this.$tr('currAnswer', { value });
         }
         return '';
       },

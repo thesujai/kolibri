@@ -7,12 +7,7 @@ jest.mock('kolibri-design-system/lib/composables/useKResponsiveWindow');
 
 const localVue = createLocalVue();
 localVue.use(Vuex);
-const store = new Store({
-  getters: {
-    isUserLoggedIn: jest.fn(),
-    isAppContext: jest.fn(),
-  },
-});
+const store = new Store({});
 
 store.state.core = {
   loading: false,

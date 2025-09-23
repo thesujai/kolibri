@@ -263,11 +263,13 @@ class RegisteredTask(object):
             if not permission.has_permission(user, job, view):
                 raise PermissionDenied
 
-    def validate_job_data(self, user, data):
+    def validate_job_data(self, user, data, request=None):
         # Run validator with `user` and `data` as its argument.
         if "type" not in data:
             data["type"] = self.func_string
-        validator = self.validator(data=data, context={"user": user})
+        validator = self.validator(
+            data=data, context={"user": user, "request": request}
+        )
         validator.is_valid(raise_exception=True)
         validated_data = validator.validated_data
         enqueue_args_validated_data = validated_data.pop("enqueue_args")

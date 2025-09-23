@@ -1,7 +1,7 @@
 <template>
 
   <div
-    class="epub-renderer-error"
+    class="epub-viewer-error"
     :class="{ loaded }"
     :style="{ background: $themeTokens.surface }"
   >
@@ -44,7 +44,7 @@
 
 <style lang="scss" scoped>
 
-  .epub-renderer-error {
+  .epub-viewer-error {
     position: absolute;
     top: 0;
     right: 0;
@@ -53,7 +53,7 @@
     z-index: 3;
   }
 
-  .epub-renderer-error.loaded {
+  .epub-viewer-error.loaded {
     top: 36px;
     bottom: auto;
     z-index: 0;

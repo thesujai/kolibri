@@ -5,6 +5,10 @@ const snackbarIsVisible = ref(false);
 const snackbarOptions = ref({
   text: '',
   autoDismiss: true,
+  // Property to autofocus the snackbar action button if any.
+  autofocus: false,
+  // Blur event handler for when the snackbar action button loses focus.
+  onBlur: null,
 });
 
 export default function useSnackbar() {

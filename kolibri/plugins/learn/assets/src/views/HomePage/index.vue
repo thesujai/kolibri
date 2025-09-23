@@ -1,61 +1,72 @@
 <template>
 
-  <LearnAppBarPage :appBarTitle="learnString('learnLabel')">
-    <div
-      v-if="!loading"
-      role="main"
-    >
-      <ResourceSyncingUiAlert
-        v-if="missingResources"
-        @syncComplete="hydrateHomePage"
+  <div>
+    <transition name="delay-entry">
+      <PostSetupModalGroup
+        v-if="welcomeModalVisible && isLearner"
+        isOnMyOwnUser
+        @cancel="hideWelcomeModal"
       />
-      <YourClasses
-        v-if="displayClasses"
-        class="section"
-        :classes="classes"
-        data-test="classes"
-        short
-      />
-      <ContinueLearning
-        v-if="continueLearning"
-        class="section"
-        :fromClasses="continueLearningFromClasses"
-        :data-test="
-          continueLearningFromClasses ? 'continueLearningFromClasses' : 'continueLearningOnYourOwn'
-        "
-      />
-      <AssignedLessonsCards
-        v-if="hasActiveClassesLessons"
-        class="section"
-        :lessons="activeClassesLessons"
-        displayClassName
-        recent
-        data-test="recentLessons"
-      />
-      <AssignedQuizzesCards
-        v-if="hasActiveClassesQuizzes"
-        class="section"
-        :quizzes="activeClassesQuizzes"
-        displayClassName
-        recent
-        data-test="recentQuizzes"
-      />
-      <ExploreChannels
-        v-if="displayExploreChannels"
-        :channels="channels"
-        class="section"
-        data-test="exploreChannels"
-        :short="
-          Boolean(
-            displayClasses ||
-              continueLearning ||
-              hasActiveClassesLessons ||
-              hasActiveClassesQuizzes,
-          )
-        "
-      />
-    </div>
-  </LearnAppBarPage>
+    </transition>
+    <LearnAppBarPage :appBarTitle="learnString('learnLabel')">
+      <div
+        v-if="!loading"
+        role="main"
+      >
+        <ResourceSyncingUiAlert
+          v-if="missingResources"
+          @syncComplete="hydrateHomePage"
+        />
+        <YourClasses
+          v-if="displayClasses"
+          class="section"
+          :classes="classes"
+          data-test="classes"
+          short
+        />
+        <ContinueLearning
+          v-if="continueLearning"
+          class="section"
+          :fromClasses="continueLearningFromClasses"
+          :data-test="
+            continueLearningFromClasses
+              ? 'continueLearningFromClasses'
+              : 'continueLearningOnYourOwn'
+          "
+        />
+        <AssignedLessonsCards
+          v-if="hasActiveClassesLessons"
+          class="section"
+          :lessons="activeClassesLessons"
+          displayClassName
+          recent
+          data-test="recentLessons"
+        />
+        <AssignedQuizzesCards
+          v-if="hasActiveClassesQuizzes"
+          class="section"
+          :quizzes="activeClassesQuizzes"
+          displayClassName
+          recent
+          data-test="recentQuizzes"
+        />
+        <ExploreChannels
+          v-if="displayExploreChannels"
+          :channels="channels"
+          class="section"
+          data-test="exploreChannels"
+          :short="
+            Boolean(
+              displayClasses ||
+                continueLearning ||
+                hasActiveClassesLessons ||
+                hasActiveClassesQuizzes,
+            )
+          "
+        />
+      </div>
+    </LearnAppBarPage>
+  </div>
 
 </template>
 
@@ -68,6 +79,7 @@
   import urls from 'kolibri/urls';
   import useUser from 'kolibri/composables/useUser';
   import useChannels from 'kolibri-common/composables/useChannels';
+  import { mapState } from 'vuex';
   import ResourceSyncingUiAlert from '../ResourceSyncingUiAlert';
   import useDeviceSettings from '../../composables/useDeviceSettings';
   import useLearnerResources, {
@@ -81,6 +93,7 @@
   import AssignedQuizzesCards from '../classes/AssignedQuizzesCards';
   import YourClasses from '../YourClasses';
   import LearnAppBarPage from '../LearnAppBarPage';
+  import PostSetupModalGroup from '../../../../../device/assets/src/views/PostSetupModalGroup.vue';
   import commonLearnStrings from './../commonLearnStrings';
   import ContinueLearning from './ContinueLearning';
   import ExploreChannels from './ExploreChannels';
@@ -91,6 +104,7 @@
    * What sections are displayed depends on whether a learner
    * is signed in and also if they're a member of classes.
    */
+  const welcomeDismissalKey = 'DEVICE_WELCOME_MODAL_DISMISSED';
   export default {
     name: 'HomePage',
     components: {
@@ -101,6 +115,7 @@
       ExploreChannels,
       LearnAppBarPage,
       ResourceSyncingUiAlert,
+      PostSetupModalGroup,
     },
     mixins: [commonLearnStrings],
     setup() {
@@ -108,7 +123,7 @@
       const store = currentInstance.$store;
       const router = currentInstance.$router;
 
-      const { isUserLoggedIn } = useUser();
+      const { isUserLoggedIn, user_id, isLearner } = useUser();
       const { canAccessUnassignedContent } = useDeviceSettings();
       const { localChannelsCache, fetchChannels } = useChannels();
       const {
@@ -218,12 +233,37 @@
         displayClasses,
         missingResources,
         hydrateHomePage,
+        userId: user_id,
+        isLearner,
       };
     },
     props: {
       loading: {
         type: Boolean,
         default: null,
+      },
+    },
+    computed: {
+      ...mapState({
+        welcomeModalVisibleState: 'welcomeModalVisible',
+      }),
+      welcomeModalVisible() {
+        return (
+          this.welcomeModalVisibleState &&
+          window.localStorage.getItem(`${welcomeDismissalKey}-${this.userId}`) !== 'true'
+        );
+      },
+    },
+    created() {
+      const welcomeDismissalKey = 'DEVICE_WELCOME_MODAL_DISMISSED';
+      if (window.sessionStorage.getItem(`${welcomeDismissalKey}-${this.userId}`) !== 'true') {
+        this.$store.commit('SET_WELCOME_MODAL_VISIBLE', true);
+      }
+    },
+    methods: {
+      hideWelcomeModal() {
+        window.localStorage.setItem(`${welcomeDismissalKey}-${this.userId}`, true);
+        this.$store.commit('SET_WELCOME_MODAL_VISIBLE', false);
       },
     },
   };

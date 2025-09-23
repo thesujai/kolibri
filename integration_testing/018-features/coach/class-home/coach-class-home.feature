@@ -16,7 +16,7 @@ Feature: General navigation on *Class home* tab
     When I click on the class name of a class
     Then I am at *Class home > <class>* page for the class
     	And I see the name of the class, the assigned coaches and the number of learners
-    	And I see the *View learners* link, the *Print report* and the *Export as CSV* icons
+    	And I see the *View learners* link, the *Print report* and the *Export as CSV* icons #the *View learners* link is visible only when there are assigned resources to learners on learn-only devices
     	And I see the *Quizzes*, *Lessons* and *Class activity* panels
     	And I can view all of the available information for the learners' progress and activities
 
@@ -79,9 +79,3 @@ Feature: General navigation on *Class home* tab
     Then I see a list of progress options: All, Completed, Started, Help needed
     When I select a resource type and progress type
     Then I see only results for corresponding to the applied filters
-
-  Scenario: Print the class home page
-  	TO DO
-
-  Scenario: Download the class activity
-  	TO DO

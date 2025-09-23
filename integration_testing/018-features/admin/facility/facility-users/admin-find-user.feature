@@ -27,10 +27,10 @@ Feature: Admin finds users
     Then I see just the user I was searching for
 
   Scenario: Clear search
-    Given that I wrote user's username in the search field
+    Given that I've entered the user's username in the search field
       And I see the filtered results
       And I see the number of pages as '1 of 1'
-    When I click the clear *X* button, or tab to focus it and press Enter, or I delete what I wrote
+    When I click the clear *X* button #or tab to focus it and press Enter, or I delete what I wrote
     Then I see the full (unfiltered) list of users
       And I see the full number of pages
 

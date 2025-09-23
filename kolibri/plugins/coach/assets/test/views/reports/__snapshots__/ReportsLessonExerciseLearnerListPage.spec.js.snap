@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`LessonExerciseLearnersPage for a lesson restricted to some groups recipients only when displaying all learners renders a correct summary tally 1`] = `
 <div class="multi-line">

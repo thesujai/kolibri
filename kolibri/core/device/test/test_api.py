@@ -15,15 +15,9 @@ from morango.models import InstanceIDModel
 from morango.models import SyncSession
 from morango.models import TransferSession
 from rest_framework import status
-from rest_framework.test import APIClient
 from rest_framework.test import APITestCase
 
 import kolibri
-from kolibri.core.auth.constants.role_kinds import ADMIN
-from kolibri.core.auth.models import Facility
-from kolibri.core.auth.models import FacilityDataset
-from kolibri.core.auth.models import FacilityUser
-from kolibri.core.auth.models import Role
 from kolibri.core.auth.test.helpers import clear_process_cache
 from kolibri.core.auth.test.helpers import create_superuser
 from kolibri.core.auth.test.helpers import provision_device
@@ -42,223 +36,11 @@ from kolibri.core.device.models import SyncQueueStatus
 from kolibri.core.device.models import UserSyncStatus
 from kolibri.core.public.constants import user_sync_statuses
 from kolibri.core.public.constants.user_sync_options import DELAYED_SYNC
-from kolibri.plugins.app.test.helpers import register_capabilities
-from kolibri.plugins.app.utils import GET_OS_USER
-from kolibri.plugins.app.utils import interface
-from kolibri.plugins.utils.test.helpers import plugin_disabled
-from kolibri.plugins.utils.test.helpers import plugin_enabled
 from kolibri.utils.conf import OPTIONS
 from kolibri.utils.tests.helpers import override_option
 
 
 DUMMY_PASSWORD = "password"
-
-
-class DeviceProvisionTestCase(APITestCase):
-    def setUp(self):
-        clear_process_cache()
-
-    superuser_data = {"username": "superuser", "password": "password"}
-    facility_data = {"name": "Wilson Elementary"}
-    preset_data = "nonformal"
-    dataset_data = {
-        "learner_can_edit_username": True,
-        "learner_can_edit_name": True,
-        "learner_can_edit_password": True,
-        "learner_can_sign_up": True,
-        "learner_can_delete_account": True,
-        "learner_can_login_with_no_password": False,
-    }
-    settings = {}
-    allow_guest_access = True
-
-    language_id = "en"
-
-    def _default_provision_data(self):
-        return {
-            "device_name": None,
-            "superuser": self.superuser_data,
-            "facility": self.facility_data,
-            "preset": self.preset_data,
-            "settings": self.settings,
-            "language_id": self.language_id,
-            "allow_guest_access": self.allow_guest_access,
-        }
-
-    def _post_deviceprovision(self, data):
-        return self.client.post(
-            reverse("kolibri:core:deviceprovision"), data, format="json"
-        )
-
-    def test_personal_setup_defaults(self):
-        data = self._default_provision_data()
-        data["preset"] = "informal"
-        # Client should pass an empty Dict for settings
-        data["settings"] = {}
-        self._post_deviceprovision(data)
-        settings = FacilityDataset.objects.get()
-        self.assertEqual(settings.learner_can_edit_username, True)
-        self.assertEqual(settings.learner_can_edit_name, True)
-        self.assertEqual(settings.learner_can_edit_password, True)
-        self.assertEqual(settings.learner_can_sign_up, True)
-        self.assertEqual(settings.learner_can_delete_account, True)
-        self.assertEqual(settings.learner_can_login_with_no_password, False)
-        self.assertEqual(settings.show_download_button_in_learn, True)
-
-        device_settings = DeviceSettings.objects.get()
-        self.assertEqual(device_settings.allow_guest_access, True)
-
-    def test_cannot_post_if_provisioned(self):
-        provision_device()
-        data = self._default_provision_data()
-        response = self._post_deviceprovision(data)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_superuser_created(self):
-        data = self._default_provision_data()
-        self._post_deviceprovision(data)
-        self.assertEqual(
-            FacilityUser.objects.get().username, self.superuser_data["username"]
-        )
-
-    def test_superuser_password_set_correctly(self):
-        data = self._default_provision_data()
-        self._post_deviceprovision(data)
-        self.assertTrue(
-            FacilityUser.objects.get().check_password(self.superuser_data["password"])
-        )
-
-    def test_superuser_device_permissions_created(self):
-        data = self._default_provision_data()
-        self._post_deviceprovision(data)
-        self.assertEqual(
-            DevicePermissions.objects.get(),
-            FacilityUser.objects.get().devicepermissions,
-        )
-
-    def test_facility_created(self):
-        data = self._default_provision_data()
-        self._post_deviceprovision(data)
-        self.assertEqual(Facility.objects.get().name, self.facility_data["name"])
-
-    def test_admin_role_created(self):
-        data = self._default_provision_data()
-        self._post_deviceprovision(data)
-        self.assertEqual(Role.objects.get().kind, ADMIN)
-
-    def test_facility_role_created(self):
-        data = self._default_provision_data()
-        self._post_deviceprovision(data)
-        self.assertEqual(Role.objects.get().collection.name, self.facility_data["name"])
-
-    def test_dataset_set_created(self):
-        data = self._default_provision_data()
-        self._post_deviceprovision(data)
-        self.assertEqual(
-            FacilityDataset.objects.get().learner_can_edit_username,
-            self.dataset_data["learner_can_edit_username"],
-        )
-        self.assertEqual(
-            FacilityDataset.objects.get().learner_can_edit_name,
-            self.dataset_data["learner_can_edit_name"],
-        )
-        self.assertEqual(
-            FacilityDataset.objects.get().learner_can_edit_password,
-            self.dataset_data["learner_can_edit_password"],
-        )
-        self.assertEqual(
-            FacilityDataset.objects.get().learner_can_sign_up,
-            self.dataset_data["learner_can_sign_up"],
-        )
-        self.assertEqual(
-            FacilityDataset.objects.get().learner_can_delete_account,
-            self.dataset_data["learner_can_delete_account"],
-        )
-        self.assertEqual(
-            FacilityDataset.objects.get().learner_can_login_with_no_password,
-            self.dataset_data["learner_can_login_with_no_password"],
-        )
-
-    def test_device_settings_created(self):
-        data = self._default_provision_data()
-        self.assertEqual(DeviceSettings.objects.count(), 0)
-        self._post_deviceprovision(data)
-        self.assertEqual(DeviceSettings.objects.count(), 1)
-
-    def test_device_settings_values(self):
-        data = self._default_provision_data()
-        data["allow_guest_access"] = False
-        self._post_deviceprovision(data)
-        device_settings = DeviceSettings.objects.get()
-        self.assertEqual(device_settings.default_facility, Facility.objects.get())
-        self.assertFalse(device_settings.allow_guest_access)
-        self.assertFalse(device_settings.allow_peer_unlisted_channel_import)
-        self.assertTrue(device_settings.allow_learner_unassigned_resource_access)
-
-    def test_create_superuser_error(self):
-        data = self._default_provision_data()
-        data.update({"superuser": {}})
-        response = self._post_deviceprovision(data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_osuser_superuser_error_no_app(self):
-        with plugin_disabled("kolibri.plugins.app"):
-            data = self._default_provision_data()
-            del data["superuser"]
-            response = self._post_deviceprovision(data)
-            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_osuser_superuser_created(self):
-        with plugin_enabled("kolibri.plugins.app"), register_capabilities(
-            **{GET_OS_USER: lambda x: ("test_user", True)}
-        ):
-            initialize_url = interface.get_initialize_url(auth_token="test")
-            self.client.get(initialize_url)
-            data = self._default_provision_data()
-            del data["superuser"]
-            data.update({"auth_token": "test"})
-            self._post_deviceprovision(data)
-            self.client.get(initialize_url)
-            self.assertEqual(
-                DevicePermissions.objects.get(),
-                FacilityUser.objects.get().devicepermissions,
-            )
-            self.assertTrue(FacilityUser.objects.get().os_user)
-
-    def test_imported_facility_no_update(self):
-        facility = Facility.objects.create(name="This is a test")
-        settings = FacilityDataset.objects.get()
-        settings.learner_can_edit_username = True
-        settings.save()
-        data = self._default_provision_data()
-        data["facility_id"] = facility.id
-        del data["facility"]
-        # Client should pass an empty Dict for settings
-        data["settings"] = {
-            "learner_can_edit_username": False,
-            "on_my_own_setup": True,
-        }
-        settings.refresh_from_db()
-        facility.refresh_from_db()
-        self._post_deviceprovision(data)
-        self.assertEqual(settings.learner_can_edit_username, True)
-        self.assertEqual(facility.on_my_own_setup, False)
-
-    def test_imported_facility_with_fake_facility_id(self):
-        data = self._default_provision_data()
-        # Fake facility_id
-        data["facility_id"] = "12345678123456781234567812345678"
-        del data["facility"]
-        response = self._post_deviceprovision(data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_imported_facility_with_no_facility_data(self):
-        data = self._default_provision_data()
-        # Try to create facility with no data
-        data["facility_id"] = None
-        del data["facility"]
-        response = self._post_deviceprovision(data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class DeviceSettingsTestCase(APITestCase):
@@ -514,14 +296,14 @@ class DeviceNameTestCase(APITestCase):
         response = self.client.get(reverse("kolibri:core:devicename"))
         self.assertEqual(
             response.data["name"],
-            InstanceIDModel.get_or_create_current_instance()[0].hostname,
+            InstanceIDModel.get_or_create_current_instance()[0].hostname[:50],
         )
 
     def test_patch(self):
         device_settings = DeviceSettings.objects.get()
         self.assertEqual(
             device_settings.name,
-            InstanceIDModel.get_or_create_current_instance()[0].hostname,
+            InstanceIDModel.get_or_create_current_instance()[0].hostname[:50],
         )
 
         response = self.client.patch(
@@ -533,7 +315,7 @@ class DeviceNameTestCase(APITestCase):
         self.assertEqual(device_settings.name, self.device_name["name"])
         self.assertNotEqual(
             device_settings.name,
-            InstanceIDModel.get_or_create_current_instance()[0].hostname,
+            InstanceIDModel.get_or_create_current_instance()[0].hostname[:50],
         )
 
     def test_device_name_max_length(self):
@@ -980,31 +762,3 @@ class UserSyncStatusTestCase(APITestCase):
         content_removal_request.save()
         response = self.client.get(reverse("kolibri:core:usersyncstatus-list"))
         self.assertFalse(response.data[0]["sync_downloads_in_progress"])
-
-
-class CSRFProtectedDeviceTestCase(APITestCase):
-    def setUp(self):
-        clear_process_cache()
-        self.client_csrf = APIClient(enforce_csrf_checks=True)
-        self.superuser_data = {"username": "superuser", "password": "password"}
-        self.facility_data = {"name": "Wilson Elementary"}
-        self.preset_data = "nonformal"
-        self.settings = {}
-        self.allow_guest_access = True
-        self.language_id = "en"
-
-    def test_csrf_protected_deviceprovision(self):
-        response = self.client_csrf.post(
-            reverse("kolibri:core:deviceprovision"),
-            {
-                "device_name": None,
-                "superuser": self.superuser_data,
-                "facility": self.facility_data,
-                "preset": self.preset_data,
-                "settings": self.settings,
-                "language_id": self.language_id,
-                "allow_guest_access": self.allow_guest_access,
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

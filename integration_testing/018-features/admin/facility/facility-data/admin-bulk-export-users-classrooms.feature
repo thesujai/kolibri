@@ -10,7 +10,7 @@ Feature: Admin bulk export of users and classrooms
     When I click on *Generate user CSV file* link under the *Import and export users* heading
     Then I see the loading indicator
     	And I see that the *Download CSV* button becomes enabled
-    	When I click on the *Download CSV* button
-      And I can open or save the file '<facility>_users.csv'
-    When I open the CSV file
+    When I click on the *Download CSV* button
+      And I save the file '<facility>_users.csv' on the device
+    	And I open the CSV file
     Then I see that it contains only users from my facility, even if there are more facilities in the device

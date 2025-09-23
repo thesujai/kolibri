@@ -1,10 +1,10 @@
 <template>
 
   <CoreFullscreen
-    ref="epubRenderer"
-    class="epub-renderer"
+    ref="epubViewer"
+    class="epub-viewer"
     :class="{ small: windowIsSmall, scrolled: scrolled }"
-    :style="epubRendererStyle"
+    :style="epubViewerStyle"
     @changeFullscreen="isInFullscreen = $event"
   >
     <LoadingError
@@ -15,7 +15,7 @@
     <LoadingScreen v-else-if="!loaded" />
 
     <div
-      class="epub-renderer-content"
+      class="epub-viewer-content"
       :style="{ 'border-color': $themeTokens.fineLine }"
       :dir="contentDirection"
       @mousedown.stop="handleMouseDown"
@@ -29,7 +29,7 @@
         @tableOfContentsButtonClicked="handleTocToggle"
         @settingsButtonClicked="handleSettingToggle"
         @searchButtonClicked="handleSearchToggle"
-        @fullscreenButtonClicked="$refs.epubRenderer.toggleFullscreen()"
+        @fullscreenButtonClicked="$refs.epubViewer.toggleFullscreen()"
       />
 
       <FocusLock
@@ -172,6 +172,8 @@
   import FocusLock from 'vue-focus-lock';
   import CoreFullscreen from 'kolibri-common/components/CoreFullscreen';
   import useKResponsiveWindow from 'kolibri-design-system/lib/composables/useKResponsiveWindow';
+  import useContentViewer, { contentViewerProps } from 'kolibri/composables/useContentViewer';
+  import { ref, computed } from 'vue';
   import iFrameView from './SandboxIFrameView';
   import LoadingScreen from './LoadingScreen';
   import LoadingError from './LoadingError';
@@ -220,18 +222,45 @@
       SearchButton,
       LoadingError,
     },
-    setup() {
+    setup(props, context) {
       const { windowIsSmall } = useKResponsiveWindow();
+      const locations = ref([]);
+      const defaultDuration = computed(() => {
+        const WORDS_PER_MINUTE = 300;
+        const CHARS_PER_WORD = 10;
+        const LOCATIONS_INTERVAL = 1000;
+        if (!locations.value.length) {
+          return null;
+        }
+        const numberOfWords = (locations.value.length * LOCATIONS_INTERVAL) / CHARS_PER_WORD;
+        const seconds = (numberOfWords * 60) / WORDS_PER_MINUTE;
+        return seconds;
+      });
+      const {
+        defaultFile,
+        forceDurationBasedProgress,
+        durationBasedProgress,
+        contentDirection,
+        contentIsRtl,
+        reportLoadingError,
+      } = useContentViewer(props, context, { defaultDuration });
       return {
         windowIsSmall,
+        locations,
+        defaultFile,
+        forceDurationBasedProgress,
+        durationBasedProgress,
+        contentDirection,
+        contentIsRtl,
+        reportLoadingError,
       };
     },
+    props: contentViewerProps,
     data() {
       return {
         book: null,
         rendition: null,
         toc: [],
-        locations: [],
         loaded: false,
         errorLoading: false,
         sideBarOpen: null,
@@ -330,7 +359,7 @@
       searchSideBarIsOpen() {
         return this.sideBarOpen === SIDE_BARS.SEARCH;
       },
-      epubRendererStyle() {
+      epubViewerStyle() {
         return {
           backgroundColor: this.$themeTokens.surface,
         };
@@ -357,16 +386,6 @@
       },
       increaseFontSizeDisabled() {
         return this.fontSize === `${FONT_SIZE_MAX}px`;
-      },
-      /**
-       * @public
-       */
-      defaultDuration() {
-        const WORDS_PER_MINUTE = 300;
-        const CHARS_PER_WORD = 10;
-        const numberOfWords = (this.locations.length * LOCATIONS_INTERVAL) / CHARS_PER_WORD;
-        const seconds = (numberOfWords * 60) / WORDS_PER_MINUTE;
-        return seconds;
       },
       locationsAreReady() {
         return this.locations && this.locations.length > 0;
@@ -580,7 +599,7 @@
       },
       handleMouseDown(event) {
         // This check is necessary because event listeners don't seem to be removed on beforeDestroy
-        if (this.$refs.epubRenderer) {
+        if (this.$refs.epubViewer) {
           let closeSideBar = false;
           if (this.tocSideBarIsOpen) {
             closeSideBar = !this.$refs.tocSideBar.$el.contains(event.target);
@@ -796,7 +815,7 @@
   $navigation-button-small: 36px;
   $navigation-button-normal: 52px;
 
-  .epub-renderer {
+  .epub-viewer {
     position: relative;
     // Counter-balance the padding to avoid unnecessary scroll
     height: calc(100vh - 64px);
@@ -806,12 +825,12 @@
     border-radius: $radius;
   }
 
-  .epub-renderer:fullscreen,
-  .epub-renderer.small:fullscreen {
+  .epub-viewer:fullscreen,
+  .epub-viewer.small:fullscreen {
     padding: 0;
   }
 
-  .epub-renderer-content {
+  .epub-viewer-content {
     position: relative;
     height: 100%;
     overflow: hidden;
@@ -914,15 +933,15 @@
     left: 0;
   }
 
-  .epub-renderer.small .epubjs-navigation {
+  .epub-viewer.small .epubjs-navigation {
     width: $navigation-button-small;
   }
 
-  .epub-renderer.small .epubjs-parent {
+  .epub-viewer.small .epubjs-parent {
     width: calc(100% - (#{$navigation-button-small} * 2));
   }
 
-  .epub-renderer.scrolled {
+  .epub-viewer.scrolled {
     .epubjs-navigation {
       display: none;
     }

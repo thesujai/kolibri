@@ -50,15 +50,13 @@
         class="content-wrapper"
         :style="{ backgroundColor: $themePalette.grey.v_100 }"
       >
-        <ContentRenderer
-          ref="contentRenderer"
-          :kind="kind"
+        <ContentViewer
+          ref="contentViewer"
           :lang="lang"
           :files="files"
-          :available="available"
           :extraFields="extraFields"
           :assessment="true"
-          :itemId="itemId"
+          :itemId="currentItemId"
           :progress="progress"
           :userId="userId"
           :userFullName="userFullName"
@@ -146,12 +144,13 @@
 
   import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
   import { MasteryModelGenerators } from 'kolibri/constants';
+  import { contentViewerProps } from 'kolibri/composables/useContentViewer';
   import shuffled from 'kolibri-common/utils/shuffled';
   import UiAlert from 'kolibri-design-system/lib/keen/UiAlert';
   import useKResponsiveWindow from 'kolibri-design-system/lib/composables/useKResponsiveWindow';
   import BottomAppBar from 'kolibri/components/BottomAppBar';
   import CoreInfoIcon from 'kolibri-common/components/labels/CoreInfoIcon';
-  import { createTranslator, defaultLanguage } from 'kolibri/utils/i18n';
+  import { createTranslator } from 'kolibri/utils/i18n';
   import useUser from 'kolibri/composables/useUser';
   import LessonMasteryBar from './LessonMasteryBar';
   import ExerciseAttempts from './ExerciseAttempts';
@@ -191,22 +190,7 @@
       };
     },
     props: {
-      lang: {
-        type: Object,
-        default: () => defaultLanguage,
-      },
-      kind: {
-        type: String,
-        required: true,
-      },
-      files: {
-        type: Array,
-        default: () => [],
-      },
-      available: {
-        type: Boolean,
-        default: false,
-      },
+      ...contentViewerProps,
       assessmentIds: {
         type: Array,
         required: true,
@@ -218,29 +202,6 @@
       masteryModel: {
         type: Object,
         required: true,
-      },
-      extraFields: {
-        type: Object,
-        default: () => ({}),
-      },
-      // An explicit record of the current progress through this
-      // piece of content.
-      progress: {
-        type: Number,
-        default: 0,
-      },
-      // An identifier for the user interacting with this content
-      userId: {
-        type: String,
-        default: null,
-      },
-      userFullName: {
-        type: String,
-        default: null,
-      },
-      timeSpent: {
-        type: Number,
-        default: null,
       },
       pastattempts: {
         type: Array,
@@ -258,7 +219,7 @@
     data() {
       return {
         mounted: false,
-        itemId: '',
+        currentItemId: '',
         shake: false,
         firstAttemptAtQuestion: true,
         complete: false,
@@ -334,14 +295,14 @@
         }
         return null;
       },
-      renderer() {
-        return this.mounted && this.$refs.contentRenderer;
+      viewer() {
+        return this.mounted && this.$refs.contentViewer;
       },
       availableHints() {
-        return (this.renderer && this.renderer.availableHints) || 0;
+        return (this.viewer && this.viewer.availableHints) || 0;
       },
       totalHints() {
-        return (this.renderer && this.renderer.totalHints) || 0;
+        return (this.viewer && this.viewer.totalHints) || 0;
       },
     },
     watch: {
@@ -356,7 +317,7 @@
     },
     methods: {
       takeHint() {
-        this.renderer && this.renderer.takeHint();
+        this.viewer && this.viewer.takeHint();
       },
       exerciseProgress(submittingAttempt) {
         if (this.mastered) {
@@ -389,7 +350,7 @@
         this.checkWasAttempted = true;
         if (!this.checkingAnswer) {
           this.checkingAnswer = true;
-          const answer = this.$refs.contentRenderer.checkAnswer();
+          const answer = this.$refs.contentViewer.checkAnswer();
           if (answer) {
             this.answerGiven(answer);
           }
@@ -427,7 +388,7 @@
           correct: this.correct,
           hinted: this.hintWasTaken,
           error: this.itemError,
-          item: this.itemId,
+          item: this.currentItemId,
         };
         if (answerState) {
           interaction.answer = answerState;
@@ -450,9 +411,9 @@
         const index = this.totalattempts % this.assessmentIds.length;
         if (this.randomize) {
           const seed = this.currentUserId ? this.currentUserId : Date.now();
-          this.itemId = shuffled(this.assessmentIds, seed)[index];
+          this.currentItemId = shuffled(this.assessmentIds, seed)[index];
         } else {
-          this.itemId = this.assessmentIds[index];
+          this.currentItemId = this.assessmentIds[index];
         }
       },
       nextQuestion() {

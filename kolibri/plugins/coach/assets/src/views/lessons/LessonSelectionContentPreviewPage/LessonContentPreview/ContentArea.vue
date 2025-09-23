@@ -7,15 +7,13 @@
     >
       {{ header }}
     </h2>
-    <ContentRenderer
+    <ContentViewer
       v-if="content.available"
-      class="content-renderer"
+      class="content-viewer"
       :showCorrectAnswer="true"
       :itemId="selectedQuestion"
       :allowHints="false"
-      :kind="content.kind"
       :files="content.files"
-      :available="content.available"
       :extraFields="content.extra_fields"
       :interactive="false"
     />
@@ -65,7 +63,7 @@
 
 <style lang="scss" scoped>
 
-  .content-renderer {
+  .content-viewer {
     height: 100vh;
   }
 

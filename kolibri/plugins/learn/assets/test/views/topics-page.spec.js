@@ -94,7 +94,7 @@ jest.mock('../../src/composables/useContentLink');
 jest.mock('kolibri-common/composables/useChannels');
 jest.mock('kolibri-design-system/lib/composables/useKResponsiveWindow');
 // Needed to test anything using mount() where children use this composable
-jest.mock('../../src/composables/useLearningActivities');
+jest.mock('kolibri-common/composables/useLearningActivities');
 
 const localVue = createLocalVue();
 localVue.use(VueRouter);
@@ -135,9 +135,7 @@ describe('TopicsPage', () => {
 
     ContentNodeResource.fetchTree.mockResolvedValue(DEFAULT_TOPIC);
 
-    store = makeStore({
-      getters: { isUserLoggedIn: jest.fn() },
-    });
+    store = makeStore({});
     store.state.core = {
       ...store.state.core,
       loading: false,

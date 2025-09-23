@@ -136,7 +136,7 @@ describe('UrlResolver', () => {
 
   describe('Error handling', () => {
     test('throws error for non-existent patterns', () => {
-      expect(() => Urls.nonExistentPattern()).toThrow('URL pattern "nonExistentPattern" not found');
+      expect(Urls.nonExistentPattern).toBeUndefined();
     });
 
     test('handles initialization with no plugin data', () => {
@@ -144,9 +144,7 @@ describe('UrlResolver', () => {
       plugin_data.urls = undefined;
       const UrlsNoData = createUrlResolver();
 
-      expect(() => UrlsNoData['user_profile_detail'](123)).toThrow(
-        'URL pattern "user_profile_detail" not found',
-      );
+      expect(UrlsNoData['user_profile_detail']).toBeUndefined();
     });
     test('throws error if URL pattern contains a dash', () => {
       jest.resetModules();

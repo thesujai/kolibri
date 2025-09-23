@@ -1,8 +1,8 @@
-import ContentRendererModule from 'kolibri-viewer';
+import ContentViewerModule from 'kolibri-viewer';
 import BloomPubComponent from './views/BloomPubRendererIndex.vue';
 
-class BloomPubModule extends ContentRendererModule {
-  get rendererComponent() {
+class BloomPubModule extends ContentViewerModule {
+  get viewerComponent() {
     return BloomPubComponent;
   }
 }

@@ -54,9 +54,9 @@
     },
     mixins: [commonCoach, commonCoreStrings],
     setup() {
-      const { facility_id } = useUser();
+      const { userFacilityId } = useUser();
       const { facilities, userIsMultiFacilityAdmin } = useFacilities();
-      return { facility_id, userIsMultiFacilityAdmin, facilities };
+      return { userFacilityId, userIsMultiFacilityAdmin, facilities };
     },
     props: {
       subtopicName: {
@@ -67,7 +67,7 @@
     },
     beforeMount() {
       if (!this.userIsMultiFacilityAdmin) {
-        const singleFacility = { id: this.facility_id };
+        const singleFacility = { id: this.userFacilityId };
         this.$router.replace(this.coachClassListPageLink(singleFacility));
       }
     },
