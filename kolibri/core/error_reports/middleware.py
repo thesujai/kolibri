@@ -22,21 +22,54 @@ from kolibri.core.error_reports.utils.scrubber import scrub_data
 from kolibri.plugins.registry import registered_plugins
 
 
+def _extract_json_body(request):
+    if hasattr(request, "data") and request.data:
+        return request.data
+    elif hasattr(request, "json") and request.json:
+        return request.json
+    else:
+        try:
+            raw_body = request.body
+            if raw_body:
+                return json.loads(raw_body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+            return "<body not available - already consumed>"
+    return None
+
+
+def _extract_text_body(request):
+    try:
+        raw_body = request.body
+        if raw_body:
+            body_str = raw_body.decode("utf-8", errors="replace")
+            if len(body_str) > 10000:
+                body_str = body_str[:10000] + "... [truncated]"
+            return body_str
+    except (UnicodeDecodeError, AttributeError):
+        return "<body not available - already consumed>"
+    return None
+
+
+def _get_request_body(request):
+    content_type = request.headers.get("Content-Type", "").lower()
+
+    if "application/json" in content_type:
+        try:
+            return _extract_json_body(request)
+        except Exception:
+            return "<body not available - parsing failed>"
+    else:
+        return _extract_text_body(request)
+
+
 def get_request_info(request):
     context = {
         "url": request.build_absolute_uri(),
         "method": request.method,
         "headers": dict(request.headers),
         "query_params": dict(request.GET),
-        "body": None,
+        "body": _get_request_body(request),
     }
-
-    if request.headers.get("Content-Type", "").lower() == "application/json":
-        try:
-            # a json req body can have sensitive data, other types can have
-            context["body"] = json.loads(request.body.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            pass
 
     scrub_data(context)
     return context
