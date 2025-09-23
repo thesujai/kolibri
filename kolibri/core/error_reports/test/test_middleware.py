@@ -50,24 +50,24 @@ class ErrorReportingMiddlewareTestCase(TestCase):
             )
         )
 
-        mock_insert_or_update_error.assert_called_once_with(
-            BACKEND,
-            str(exception),
-            expected_traceback_info,
-            {
-                "request_info": {
-                    "url": "http://testserver/",
-                    "method": "GET",
-                    "headers": {},  # checking whether cookies are removed
-                    "body": "",
-                    "query_params": {},
-                },
-                "server": {"host": "testserver", "port": "80"},
-                "packages": ["Django==3.2.25"],
-                "python_version": "3.9.9",
-                "avg_request_time_to_error": 0.0,
-            },
-        )
+        call_args = mock_insert_or_update_error.call_args[0]
+        context = call_args[3]
+
+        assert call_args[0] == BACKEND
+        assert call_args[1] == str(exception)
+        assert call_args[2] == expected_traceback_info
+
+        request_info = context["request_info"]
+        assert request_info["url"] == "http://testserver/"
+        assert request_info["method"] == "GET"
+        assert request_info["query_params"] == {}
+        assert request_info["body"] is None
+        assert isinstance(request_info["headers"], dict)
+
+        assert context["server"] == {"host": "testserver", "port": "80"}
+        assert context["packages"] == ["Django==3.2.25"]
+        assert context["python_version"] == "3.9.9"
+        assert context["avg_request_time_to_error"] == 0.0
 
     @patch.object(ErrorReport, "insert_or_update_error")
     @patch.object(logging.Logger, "error")

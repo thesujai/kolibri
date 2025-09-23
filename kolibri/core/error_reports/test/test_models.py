@@ -77,7 +77,7 @@ class ErrorReportTestCase(TestCase):
             reported=reported,
         )
 
-    @override_settings(DEVELOPER_MODE=False)
+    @override_settings(DEVELOPER_MODE=False, TESTING=False)
     def test_insert_or_update_frontend_error_prod_mode(self):
         error = ErrorReport.insert_or_update_error(
             self.category_frontend,
@@ -118,7 +118,7 @@ class ErrorReportTestCase(TestCase):
             timezone.now() - error.last_occurred, timezone.timedelta(seconds=1)
         )
 
-    @override_settings(DEVELOPER_MODE=False)
+    @override_settings(DEVELOPER_MODE=False, TESTING=False)
     def test_insert_or_update_backend_error_prod_mode(self):
         error = ErrorReport.insert_or_update_error(
             self.category_backend,
@@ -159,7 +159,7 @@ class ErrorReportTestCase(TestCase):
             timezone.now() - error.last_occurred, timezone.timedelta(seconds=1)
         )
 
-    @override_settings(DEVELOPER_MODE=False)
+    @override_settings(DEVELOPER_MODE=False, TESTING=False)
     def test_insert_or_update_task_error_prod_mode(self):
         error = ErrorReport.insert_or_update_error(
             TASK,
